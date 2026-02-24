@@ -1,0 +1,19 @@
+# Bun Configuration
+# https://bun.sh/docs/runtime/bunfig
+
+[install]
+# Configure package installation
+registry = "https://registry.npmjs.org/"
+
+[install.lockfile]
+# Lockfile configuration
+save = true
+print = "yarn"
+
+[run]
+# Shell to use for scripts
+shell = "system"
+
+[test]
+# Test runner configuration
+coverage = false

@@ -1,0 +1,7 @@
+# Makefile generated files
+*.pid
+.backend.pid
+.app.pid
+backend.log
+app.log
+.claude/

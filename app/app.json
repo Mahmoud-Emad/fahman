@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Fahman",
+    "slug": "fahman",
+    "scheme": "fahman",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f97316"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fahman.app",
+      "associatedDomains": ["applinks:fahman.app"],
+      "infoPlist": {
+        "UIStatusBarHidden": true,
+        "UIViewControllerBasedStatusBarAppearance": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f97316"
+      },
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.fahman.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "fahman",
+              "host": "*"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b8ada624-4438-45db-af23-d8759dcab9d4"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser"
+    ]
+  }
+}

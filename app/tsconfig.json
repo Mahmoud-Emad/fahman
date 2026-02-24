@@ -1,0 +1,51 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "jsx": "react",
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@/components/*": [
+        "./src/components/*"
+      ],
+      "@/screens/*": [
+        "./src/screens/*"
+      ],
+      "@/themes/*": [
+        "./src/themes/*"
+      ],
+      "@/utils/*": [
+        "./src/utils/*"
+      ],
+      "@/hooks/*": [
+        "./src/hooks/*"
+      ],
+      "@/config/*": [
+        "./src/config/*"
+      ],
+      "@/config": [
+        "./src/config"
+      ],
+      "@/services/*": [
+        "./src/services/*"
+      ],
+      "@/services": [
+        "./src/services"
+      ],
+      "@/contexts/*": [
+        "./src/contexts/*"
+      ],
+      "@/contexts": [
+        "./src/contexts"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "nativewind-env.d.ts"
+  ]
+}

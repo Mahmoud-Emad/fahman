@@ -1,0 +1,435 @@
+// Prisma Schema for Fahman Backend
+// Multiplayer Quiz/Party Game Application
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum Role {
+  NORMAL
+  ADMIN
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+  FRIENDS
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+  TRUE_FALSE
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+}
+
+enum RoomStatus {
+  WAITING
+  PLAYING
+  FINISHED
+  CLOSED
+}
+
+enum RoomRole {
+  CREATOR
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  ROOM
+  PRIVATE
+  SYSTEM
+  ROOM_INVITE
+}
+
+enum NotificationType {
+  ROOM_INVITE
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  SYSTEM
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum AuthProvider {
+  LOCAL      // Email/password or phone/password
+  GOOGLE
+  FACEBOOK
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+model User {
+  id           String    @id @default(uuid())
+
+  // Game ID - unique numeric identifier starting from 100000
+  // Used for easy login and display (e.g., "Player #100001")
+  gameId       Int       @unique @default(autoincrement()) @map("game_id")
+
+  // Basic info
+  username     String    @unique @db.VarChar(50)
+  displayName  String?   @map("display_name") @db.VarChar(100)
+  bio          String?   @db.VarChar(500)
+  email        String?   @unique @db.VarChar(255)
+  passwordHash String?   @map("password_hash") @db.VarChar(255)
+  avatar       String?   @db.VarChar(500)
+
+  // Phone authentication
+  phoneNumber              String?   @unique @map("phone_number") @db.VarChar(20)
+  phoneVerified            Boolean   @default(false) @map("phone_verified")
+  phoneVerificationCode    String?   @map("phone_verification_code") @db.VarChar(6)
+  phoneVerificationExpiry  DateTime? @map("phone_verification_expiry") @db.Timestamptz(6)
+
+  // OAuth authentication
+  authProvider  AuthProvider @default(LOCAL) @map("auth_provider")
+  providerId    String?      @map("provider_id") @db.VarChar(255) // Google/Facebook user ID
+
+  // Account status
+  lastLogin    DateTime? @map("last_login") @db.Timestamptz(6)
+  role         Role      @default(NORMAL)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isActive     Boolean   @default(true) @map("is_active")
+
+  // Streak tracking
+  currentStreak Int      @default(0) @map("current_streak")
+  bestStreak    Int      @default(0) @map("best_streak")
+  lastStreakUpdate DateTime? @map("last_streak_update") @db.Timestamptz(6)
+
+  // Virtual currency
+  coins        Int       @default(10) // New users start with 10 coins
+
+  // Relations
+  createdPacks      Pack[]         @relation("CreatedPacks")
+  friendships       Friendship[]   @relation("UserFriendships")
+  friendOf          Friendship[]   @relation("FriendOf")
+  createdRooms      Room[]         @relation("CreatedRooms")
+  roomMembers       RoomMember[]
+  sentMessages      Message[]      @relation("SentMessages")
+  receivedMessages  Message[]      @relation("ReceivedMessages")
+  purchases         PackPurchase[]
+  transactions      Transaction[]  @relation("BuyerTransactions")
+  sales             Transaction[]  @relation("SellerTransactions")
+  wonGames          GameSession[]
+  notifications     Notification[] @relation("UserNotifications")
+  sentNotifications Notification[] @relation("SentNotifications")
+  settings          UserSettings?  @relation("UserSettings")
+
+  @@unique([authProvider, providerId]) // Prevent duplicate OAuth accounts
+  @@index([email])
+  @@index([username])
+  @@index([phoneNumber])
+  @@index([gameId])
+  @@index([role])
+  @@map("users")
+}
+
+model Friendship {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  friendId    String           @map("friend_id")
+  status      FriendshipStatus @default(PENDING)
+  requestedAt DateTime         @default(now()) @map("requested_at") @db.Timestamptz(6)
+  respondedAt DateTime?        @map("responded_at") @db.Timestamptz(6)
+
+  user   User @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendOf", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
+  @@index([status])
+  @@map("friendships")
+}
+
+model Pack {
+  id          String      @id @default(uuid())
+  creatorId   String      @map("creator_id")
+  title       String      @db.VarChar(200)
+  description String?     @db.Text
+  imageUrl    String?     @map("image_url") @db.VarChar(500)
+  isStandard  Boolean     @default(false) @map("is_standard")
+  visibility  Visibility  @default(PUBLIC)
+  price       Decimal     @default(0.00) @db.Decimal(10, 2)
+  category    String?     @db.VarChar(50)
+  difficulty  Difficulty?
+  timesPlayed Int         @default(0) @map("times_played")
+  rating      Decimal     @default(0.00) @db.Decimal(3, 2)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isPublished Boolean     @default(false) @map("is_published")
+
+  creator      User           @relation("CreatedPacks", fields: [creatorId], references: [id], onDelete: Cascade)
+  questions    Question[]
+  rooms        Room[]
+  purchases    PackPurchase[]
+  transactions Transaction[]
+  gameSessions GameSession[]
+
+  @@index([creatorId])
+  @@index([visibility])
+  @@index([isStandard])
+  @@index([category])
+  @@index([difficulty])
+  @@map("packs")
+}
+
+model Question {
+  id             String       @id @default(uuid())
+  packId         String       @map("pack_id")
+  text           String       @db.Text
+  options        Json
+  correctAnswers Json         @map("correct_answers")
+  questionType   QuestionType @default(SINGLE) @map("question_type")
+  mediaUrl       String?      @map("media_url") @db.VarChar(500)
+  mediaType      MediaType?   @map("media_type")
+  timeLimit      Int          @default(30) @map("time_limit")
+  points         Int          @default(100)
+  orderIndex     Int          @map("order_index")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  pack          Pack           @relation(fields: [packId], references: [id], onDelete: Cascade)
+  playerAnswers PlayerAnswer[]
+
+  @@unique([packId, orderIndex])
+  @@index([packId])
+  @@map("questions")
+}
+
+model Room {
+  id                   String     @id @default(uuid())
+  code                 String     @unique @db.VarChar(6) // Join code (e.g., ABC123)
+  creatorId            String     @map("creator_id")
+  title                String     @db.VarChar(200)
+  description          String?    @db.Text
+  isPublic             Boolean    @default(true) @map("is_public")
+  passwordHash         String?    @map("password_hash") @db.VarChar(255)
+  maxPlayers           Int        @default(8) @map("max_players")
+  currentPlayers       Int        @default(0) @map("current_players")
+  status               RoomStatus @default(WAITING)
+  settings             Json       @default("{}")
+  selectedPackId       String?    @map("selected_pack_id")
+  currentQuestionIndex Int        @default(0) @map("current_question_index")
+  startedAt            DateTime?  @map("started_at") @db.Timestamptz(6)
+  finishedAt           DateTime?  @map("finished_at") @db.Timestamptz(6)
+  createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  creator      User          @relation("CreatedRooms", fields: [creatorId], references: [id], onDelete: Cascade)
+  selectedPack Pack?         @relation(fields: [selectedPackId], references: [id], onDelete: SetNull)
+  members      RoomMember[]
+  messages     Message[]
+  gameSessions GameSession[]
+
+  @@index([code])
+  @@index([creatorId])
+  @@index([status])
+  @@index([isPublic])
+  @@index([createdAt])
+  @@map("rooms")
+}
+
+model RoomMember {
+  id       String   @id @default(uuid())
+  roomId   String   @map("room_id")
+  userId   String   @map("user_id")
+  role     RoomRole @default(MEMBER)
+  score    Int      @default(0)
+  isReady  Boolean  @default(false) @map("is_ready")
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz(6)
+  leftAt   DateTime? @map("left_at") @db.Timestamptz(6)
+  isActive Boolean  @default(true) @map("is_active")
+
+  room    Room           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers PlayerAnswer[]
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+  @@map("room_members")
+}
+
+model PlayerAnswer {
+  id           String   @id @default(uuid())
+  roomMemberId String   @map("room_member_id")
+  questionId   String   @map("question_id")
+  answer       Json                              // Selected answer index(es)
+  betAmount    Int      @map("bet_amount")       // Bet placed on this question
+  isCorrect    Boolean  @map("is_correct")
+  pointsEarned Int      @map("points_earned")    // Can be negative for wrong answers
+  timeToAnswer Int      @map("time_to_answer")   // Milliseconds taken to answer
+  answeredAt   DateTime @default(now()) @map("answered_at") @db.Timestamptz(6)
+
+  roomMember RoomMember @relation(fields: [roomMemberId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([roomMemberId, questionId]) // One answer per question per player
+  @@index([roomMemberId])
+  @@index([questionId])
+  @@map("player_answers")
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  senderId    String      @map("sender_id")
+  roomId      String?     @map("room_id")
+  recipientId String?     @map("recipient_id")
+  text        String      @db.Text
+  messageType MessageType @default(ROOM) @map("message_type")
+  isRead      Boolean     @default(false) @map("is_read")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sender    User  @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  room      Room? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  recipient User? @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+  @@index([senderId, recipientId])
+  @@index([recipientId, isRead])
+  @@map("messages")
+}
+
+model Transaction {
+  id                   String            @id @default(uuid())
+  buyerId              String            @map("buyer_id")
+  sellerId             String?           @map("seller_id")
+  packId               String            @map("pack_id")
+  amount               Decimal           @db.Decimal(10, 2)
+  status               TransactionStatus @default(PENDING)
+  paymentMethod        String?           @map("payment_method") @db.VarChar(50)
+  transactionReference String?           @unique @map("transaction_reference") @db.VarChar(255)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt          DateTime?         @map("completed_at") @db.Timestamptz(6)
+
+  buyer     User           @relation("BuyerTransactions", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller    User?          @relation("SellerTransactions", fields: [sellerId], references: [id], onDelete: SetNull)
+  pack      Pack           @relation(fields: [packId], references: [id], onDelete: Cascade)
+  purchases PackPurchase[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([packId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model PackPurchase {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  packId        String   @map("pack_id")
+  transactionId String?  @map("transaction_id")
+  purchasedAt   DateTime @default(now()) @map("purchased_at") @db.Timestamptz(6)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pack        Pack         @relation(fields: [packId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, packId])
+  @@index([userId])
+  @@index([packId])
+  @@map("pack_purchases")
+}
+
+model GameSession {
+  id             String   @id @default(uuid())
+  roomId         String   @map("room_id")
+  packId         String   @map("pack_id")
+  winnerId       String?  @map("winner_id")
+  startedAt      DateTime @map("started_at") @db.Timestamptz(6)
+  endedAt        DateTime @map("ended_at") @db.Timestamptz(6)
+  totalQuestions Int      @map("total_questions")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  room   Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  pack   Pack  @relation(fields: [packId], references: [id], onDelete: Cascade)
+  winner User? @relation(fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([winnerId])
+  @@index([endedAt])
+  @@map("game_sessions")
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  userId     String           @map("user_id")
+  type       NotificationType
+  title      String           @db.VarChar(100)
+  message    String           @db.Text
+  senderId   String?          @map("sender_id")
+  actionData Json?            @map("action_data")
+  isRead     Boolean          @default(false) @map("is_read")
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user   User  @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  sender User? @relation("SentNotifications", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model UserSettings {
+  id                  String   @id @default(uuid())
+  userId              String   @unique @map("user_id")
+
+  // Sound settings (all default to true)
+  gameSound           Boolean  @default(true) @map("game_sound")
+  userSound           Boolean  @default(true) @map("user_sound")
+  notificationSound   Boolean  @default(true) @map("notification_sound")
+  appSound            Boolean  @default(true) @map("app_sound")
+
+  // Privacy settings (all default to true)
+  onlineStatus        Boolean  @default(true) @map("online_status")
+  roomVisibility      Boolean  @default(true) @map("room_visibility")
+  readReceipts        Boolean  @default(true) @map("read_receipts")
+
+  // Language setting
+  language            String   @default("en") @db.VarChar(5)
+
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation("UserSettings", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_settings")
+}
