@@ -6,6 +6,7 @@
 import { Response, NextFunction } from 'express';
 import roomService from '../services/roomService';
 import roomMembersService from '../services/roomMembersService';
+import { emitGameStarted, emitPlayerKicked, emitRoomClosed } from '../socket';
 import { successResponse, paginatedResponse } from '../utils/responseFormatter';
 import { AuthRequest } from '../types';
 
@@ -121,6 +122,7 @@ export async function leaveRoom(req: AuthRequest, res: Response, next: NextFunct
 export async function kickPlayer(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const result = await roomMembersService.kickPlayer(req.user.id, req.params.id, req.params.userId);
+    emitPlayerKicked(req.params.id, req.params.userId, 'Kicked by room host');
     res.json(successResponse(result, 'Player kicked successfully'));
   } catch (error) {
     next(error);
@@ -144,6 +146,7 @@ export async function updateRoom(req: AuthRequest, res: Response, next: NextFunc
  */
 export async function deleteRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    emitRoomClosed(req.params.id, 'Room deleted by host');
     const result = await roomService.deleteRoom(
       req.user.id,
       req.params.id,
@@ -161,6 +164,7 @@ export async function deleteRoom(req: AuthRequest, res: Response, next: NextFunc
 export async function startGame(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const result = await roomService.startGame(req.user.id, req.params.id);
+    emitGameStarted(req.params.id);
     res.json(successResponse(result, 'Game started successfully'));
   } catch (error) {
     next(error);
