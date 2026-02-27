@@ -27,12 +27,51 @@ export function GameResultsScreen() {
   const route = useRoute<GameResultsScreenRouteProp>();
   const toast = useToast();
 
-  const { winner, finalScores, roomId, packTitle, currentUserId } = route.params;
+  const { roomId, currentUserId } = route.params;
+
+  // Use route params as initial data, refresh from API
+  const [winner, setWinner] = useState(route.params.winner);
+  const [finalScores, setFinalScores] = useState(route.params.finalScores);
+  const [packTitle, setPackTitle] = useState(route.params.packTitle);
   const [isValidating, setIsValidating] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const winnerScale = useRef(new Animated.Value(0.5)).current;
+
+  // Fetch fresh results from API
+  useEffect(() => {
+    if (!roomId) return;
+    roomsService.getGameResults(roomId).then((res) => {
+      if (!res.success || !res.data) return;
+      const { results, winner: apiWinner, pack } = res.data;
+      if (apiWinner) {
+        const topResult = results[0];
+        setWinner({
+          id: apiWinner.id,
+          username: apiWinner.username,
+          displayName: apiWinner.displayName,
+          avatar: apiWinner.avatar,
+          score: topResult?.score ?? 0,
+        });
+      }
+      if (results?.length) {
+        setFinalScores(results.map((r: { user: { id: string; username: string; displayName: string | null; avatar: string | null }; score: number; rank: number }) => ({
+          playerId: r.user.id,
+          username: r.user.username,
+          displayName: r.user.displayName,
+          avatar: r.user.avatar,
+          score: r.score,
+          rank: r.rank,
+        })));
+      }
+      if (pack?.title) {
+        setPackTitle(pack.title);
+      }
+    }).catch(() => {
+      // Silently fall back to route params (already set as initial state)
+    });
+  }, [roomId]);
 
   useEffect(() => {
     Animated.parallel([
