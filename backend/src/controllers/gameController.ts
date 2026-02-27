@@ -5,6 +5,7 @@
 
 import { Response, NextFunction } from 'express';
 import gameService from '../services/gameService';
+import gameResultsService from '../services/gameResultsService';
 import { successResponse } from '../utils/responseFormatter';
 import { AuthRequest } from '../types';
 
@@ -55,7 +56,7 @@ export async function nextQuestion(req: AuthRequest, res: Response, next: NextFu
  */
 export async function getResults(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const results = await gameService.getResults(req.params.id, req.user.id);
+    const results = await gameResultsService.getResults(req.params.id, req.user.id);
     res.json(successResponse(results));
   } catch (error) {
     next(error);
@@ -67,7 +68,7 @@ export async function getResults(req: AuthRequest, res: Response, next: NextFunc
  */
 export async function getLeaderboard(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const leaderboard = await gameService.getLeaderboard(req.params.id, req.user.id);
+    const leaderboard = await gameResultsService.getLeaderboard(req.params.id, req.user.id);
     res.json(successResponse(leaderboard));
   } catch (error) {
     next(error);
@@ -79,7 +80,7 @@ export async function getLeaderboard(req: AuthRequest, res: Response, next: Next
  */
 export async function getQuestionResults(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const results = await gameService.getQuestionResults(
+    const results = await gameResultsService.getQuestionResults(
       req.params.id,
       req.params.questionId,
       req.user.id

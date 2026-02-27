@@ -5,6 +5,7 @@
 
 import { Response, NextFunction } from 'express';
 import friendService from '../services/friendService';
+import friendRequestService from '../services/friendRequestService';
 import { successResponse } from '../utils/responseFormatter';
 import { AuthRequest } from '../types';
 
@@ -50,7 +51,7 @@ export async function getSentRequests(req: AuthRequest, res: Response, next: Nex
 export async function sendFriendRequest(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { userId } = req.body;
-    const result = await friendService.sendFriendRequest(req.user.id, userId);
+    const result = await friendRequestService.sendFriendRequest(req.user.id, userId);
     res.status(201).json(successResponse(result, 'Friend request sent'));
   } catch (error) {
     next(error);
@@ -63,7 +64,7 @@ export async function sendFriendRequest(req: AuthRequest, res: Response, next: N
 export async function sendFriendRequestByIdentifier(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { identifier } = req.body;
-    const result = await friendService.sendFriendRequestByIdentifier(req.user.id, identifier);
+    const result = await friendRequestService.sendFriendRequestByIdentifier(req.user.id, identifier);
     res.status(201).json(successResponse(result, 'Friend request sent'));
   } catch (error) {
     next(error);
@@ -75,7 +76,7 @@ export async function sendFriendRequestByIdentifier(req: AuthRequest, res: Respo
  */
 export async function acceptFriendRequest(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await friendService.acceptFriendRequest(req.user.id, req.params.id);
+    const result = await friendRequestService.acceptFriendRequest(req.user.id, req.params.id);
     res.json(successResponse(result, 'Friend request accepted'));
   } catch (error) {
     next(error);
@@ -87,7 +88,7 @@ export async function acceptFriendRequest(req: AuthRequest, res: Response, next:
  */
 export async function declineFriendRequest(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await friendService.declineFriendRequest(req.user.id, req.params.id);
+    const result = await friendRequestService.declineFriendRequest(req.user.id, req.params.id);
     res.json(successResponse(result, 'Friend request declined'));
   } catch (error) {
     next(error);
@@ -99,7 +100,7 @@ export async function declineFriendRequest(req: AuthRequest, res: Response, next
  */
 export async function cancelFriendRequest(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await friendService.cancelFriendRequest(req.user.id, req.params.id);
+    const result = await friendRequestService.cancelFriendRequest(req.user.id, req.params.id);
     res.json(successResponse(result, 'Friend request cancelled'));
   } catch (error) {
     next(error);

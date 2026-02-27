@@ -18,6 +18,13 @@ import { registerRoomHandlers, broadcastRoomClosed, notifyPlayerKicked } from '.
 import { registerGameHandlers, broadcastGameStarted, cleanupGameRoom } from './handlers/gameHandlers';
 import { registerChatHandlers, cleanupUserTyping } from './handlers/chatHandlers';
 import { registerDmHandlers, cleanupUserDmTyping, emitDirectMessage } from './handlers/dmHandlers';
+import {
+  onlineUsers,
+  trackUserOnline,
+  trackUserOffline,
+  getOnlineFriends,
+  notifyFriendsOffline,
+} from './presenceHandlers';
 import logger from '../utils/logger';
 
 // Store the io instance for use in other modules
@@ -58,7 +65,7 @@ export function initializeSocket(httpServer: HttpServer): Server {
     });
 
     // Track online status
-    trackUserOnline(authSocket.userId);
+    trackUserOnline(io, authSocket.userId);
 
     // Register event handlers
     registerRoomHandlers(io, authSocket);
@@ -134,124 +141,11 @@ export function getIO(): Server<ClientToServerEvents, ServerToClientEvents, Inte
   return ioInstance;
 }
 
-// Online users tracking (in production, use Redis)
-const onlineUsers: Set<string> = new Set();
-
-/**
- * Track user as online
- */
-function trackUserOnline(userId: string): void {
-  const wasOffline = !onlineUsers.has(userId);
-  onlineUsers.add(userId);
-
-  if (wasOffline && ioInstance) {
-    // Notify friends that user came online
-    notifyFriendsOnline(ioInstance, userId);
-  }
-}
-
-/**
- * Track user as offline
- */
-function trackUserOffline(userId: string): void {
-  onlineUsers.delete(userId);
-}
-
 /**
  * Check if user is online
  */
 export function isUserOnline(userId: string): boolean {
   return onlineUsers.has(userId);
-}
-
-/**
- * Get online friends for a user
- */
-async function getOnlineFriends(userId: string): Promise<string[]> {
-  const friendships = await prisma.friendship.findMany({
-    where: {
-      OR: [
-        { userId, status: 'ACCEPTED' },
-        { friendId: userId, status: 'ACCEPTED' },
-      ],
-    },
-    select: { userId: true, friendId: true },
-  });
-
-  const friendIds = friendships.map((f) =>
-    f.userId === userId ? f.friendId : f.userId
-  );
-
-  return friendIds.filter((id) => onlineUsers.has(id));
-}
-
-/**
- * Notify friends that user came online
- */
-async function notifyFriendsOnline(
-  io: Server<ClientToServerEvents, ServerToClientEvents>,
-  userId: string
-): Promise<void> {
-  try {
-    // Get all friends (not just online)
-    const friendships = await prisma.friendship.findMany({
-      where: {
-        OR: [
-          { userId, status: 'ACCEPTED' },
-          { friendId: userId, status: 'ACCEPTED' },
-        ],
-      },
-      select: { userId: true, friendId: true },
-    });
-
-    const friendIds = friendships.map((f) =>
-      f.userId === userId ? f.friendId : f.userId
-    );
-
-    // Notify each online friend
-    io.sockets.sockets.forEach((socket) => {
-      const authSocket = socket as AuthenticatedSocket;
-      if (friendIds.includes(authSocket.userId)) {
-        authSocket.emit('friend:online', { userId });
-      }
-    });
-  } catch (error: any) {
-    logger.error(`Error notifying friends online: ${error.message}`);
-  }
-}
-
-/**
- * Notify friends that user went offline
- */
-async function notifyFriendsOffline(
-  io: Server<ClientToServerEvents, ServerToClientEvents>,
-  userId: string
-): Promise<void> {
-  try {
-    const friendships = await prisma.friendship.findMany({
-      where: {
-        OR: [
-          { userId, status: 'ACCEPTED' },
-          { friendId: userId, status: 'ACCEPTED' },
-        ],
-      },
-      select: { userId: true, friendId: true },
-    });
-
-    const friendIds = friendships.map((f) =>
-      f.userId === userId ? f.friendId : f.userId
-    );
-
-    // Notify each online friend
-    io.sockets.sockets.forEach((socket) => {
-      const authSocket = socket as AuthenticatedSocket;
-      if (friendIds.includes(authSocket.userId)) {
-        authSocket.emit('friend:offline', { userId });
-      }
-    });
-  } catch (error: any) {
-    logger.error(`Error notifying friends offline: ${error.message}`);
-  }
 }
 
 /**
