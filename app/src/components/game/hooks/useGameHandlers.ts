@@ -1,37 +1,33 @@
 /**
- * useGameHandlers - Game action handlers
+ * useGameHandlers - Game action handlers wired to socket emissions
  */
 import { useCallback } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { Player, ChatMessage, GamePhase, RoomSettings } from "../types";
 import type { RootStackParamList } from "../../../../App";
+import { socketService } from "@/services/socketService";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "RoomDetails">;
 
 interface UseGameHandlersOptions {
+  // Room ID for socket emissions
+  roomId: string;
+
   // State values
-  answer: string;
+  selectedAnswer: number | null;
   selectedBet: number | null;
   hasSubmitted: boolean;
-  currentQuestion: number;
-  totalQuestions: number;
+  timeLeft: number;
   roomSettings: RoomSettings;
   currentUserId: string;
 
   // State setters
   setHasSubmitted: (value: boolean) => void;
-  setGamePhase: (phase: GamePhase) => void;
-  setPlayers: (updater: (prev: Player[]) => Player[]) => void;
-  setMessages: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void;
   setShowLeaveDialog: (value: boolean) => void;
   setUsedBets: (updater: (prev: number[]) => number[]) => void;
-  setCurrentQuestion: (updater: (prev: number) => number) => void;
-  setQuestionText: (text: string) => void;
-  setTimeLeft: (time: number) => void;
-  setIsTimerActive: (active: boolean) => void;
-  setAnswer: (answer: string) => void;
-  setSelectedBet: (bet: number | null) => void;
+  setPlayers: (updater: (prev: Player[]) => Player[]) => void;
+  setMessages: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void;
 
   // Messaging callbacks (optional)
   onOpenNotifications?: () => void;
@@ -39,56 +35,41 @@ interface UseGameHandlersOptions {
 }
 
 /**
- * Hook for game action handlers
+ * Hook for game action handlers — emits to socket instead of local state
  */
 export function useGameHandlers(options: UseGameHandlersOptions) {
   const navigation = useNavigation<NavigationProp>();
   const {
-    answer,
+    roomId,
+    selectedAnswer,
     selectedBet,
     hasSubmitted,
-    currentQuestion,
-    totalQuestions,
-    roomSettings,
+    timeLeft,
     currentUserId,
     setHasSubmitted,
-    setGamePhase,
-    setPlayers,
-    setMessages,
     setShowLeaveDialog,
     setUsedBets,
-    setCurrentQuestion,
-    setQuestionText,
-    setTimeLeft,
-    setIsTimerActive,
-    setAnswer,
-    setSelectedBet,
+    setPlayers,
+    setMessages,
     onOpenNotifications,
     onOpenChatsList,
   } = options;
 
-  // Handle answer submission
+  // Handle answer submission — emit to server
   const handleSubmitAnswer = useCallback(() => {
-    if (!answer.trim() || selectedBet === null || hasSubmitted) return;
+    if (selectedAnswer === null || selectedBet === null || hasSubmitted) return;
 
+    socketService.submitAnswer(roomId, selectedAnswer, selectedBet, timeLeft);
     setHasSubmitted(true);
-    setGamePhase("lobby");
-    console.log("Submitted:", { answer, bet: selectedBet });
-  }, [answer, selectedBet, hasSubmitted, setHasSubmitted, setGamePhase]);
 
-  // Handle marking player answer (host only)
-  const handleMarkPlayer = useCallback(
-    (playerId: string, isCorrect: boolean) => {
-      setPlayers((prev) =>
-        prev.map((p) =>
-          p.id === playerId
-            ? { ...p, isCorrect, score: isCorrect ? p.score + 5 : p.score - 5 }
-            : p
-        )
-      );
-    },
-    [setPlayers]
-  );
+    // Track used bet
+    setUsedBets((prev) => [...prev, selectedBet]);
+  }, [roomId, selectedAnswer, selectedBet, hasSubmitted, timeLeft, setHasSubmitted, setUsedBets]);
+
+  // Handle next question — host emits to server
+  const handleNextQuestion = useCallback(() => {
+    socketService.nextQuestion(roomId);
+  }, [roomId]);
 
   // Handle sending chat message
   const handleSendMessage = useCallback(
@@ -109,7 +90,6 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
   // Handle player actions (from menu)
   const handlePlayerAction = useCallback(
     (action: string, playerId: string) => {
-      // Handle view_profile action - navigate to user profile
       if (action === "view_profile") {
         navigation.navigate("UserProfile", { userId: playerId });
         return;
@@ -128,12 +108,6 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
               return { ...p, isMuted: !p.isMuted };
             case "block":
               return { ...p, isBlocked: !p.isBlocked };
-            case "hit":
-              console.log("Hit player:", playerId);
-              return p;
-            case "message":
-              console.log("Message player:", playerId);
-              return p;
             default:
               return p;
           }
@@ -165,54 +139,12 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
     [setShowLeaveDialog, onOpenChatsList, onOpenNotifications, navigation]
   );
 
-  // Handle next question
-  const handleNextQuestion = useCallback(() => {
-    if (currentQuestion >= totalQuestions) {
-      setGamePhase("results");
-      return;
-    }
-
-    if (selectedBet !== null) {
-      setUsedBets((prev) => [...prev, selectedBet]);
-    }
-
-    setCurrentQuestion((prev) => prev + 1);
-    setQuestionText("Next question goes here...");
-    setTimeLeft(roomSettings.timerDuration);
-    setIsTimerActive(true);
-    setGamePhase("answering");
-    setAnswer("");
-    setSelectedBet(null);
-    setHasSubmitted(false);
-    setPlayers((prev) =>
-      prev.map((p) => ({ ...p, hasAnswered: false, answer: undefined, isCorrect: undefined }))
-    );
-    setMessages([]);
-  }, [
-    currentQuestion,
-    totalQuestions,
-    selectedBet,
-    roomSettings.timerDuration,
-    setGamePhase,
-    setUsedBets,
-    setCurrentQuestion,
-    setQuestionText,
-    setTimeLeft,
-    setIsTimerActive,
-    setAnswer,
-    setSelectedBet,
-    setHasSubmitted,
-    setPlayers,
-    setMessages,
-  ]);
-
   return {
     handleSubmitAnswer,
-    handleMarkPlayer,
+    handleNextQuestion,
     handleSendMessage,
     handlePlayerAction,
     handleLeaveRoom,
     handleBottomTabPress,
-    handleNextQuestion,
   };
 }

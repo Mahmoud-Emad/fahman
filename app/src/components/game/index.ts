@@ -10,11 +10,12 @@ export type {
   GamePhase,
   GameState,
   GameStateActions,
+  PlayerResult,
 } from "./types";
-export { DEFAULT_ROOM_SETTINGS, createInitialGameState } from "./types";
+export { DEFAULT_ROOM_SETTINGS } from "./types";
 
 // UI Components
-export { TimerDisplay, BetCard, HostControls } from "./GameComponents";
+export { TimerDisplay, BetCard } from "./GameComponents";
 export { GameHeader } from "./GameHeader";
 export { SubmitButton, WaitingIndicator } from "./BottomActions";
 
@@ -27,7 +28,7 @@ export {
 } from "./phases";
 
 // Hooks
-export { useGameState, useGameHandlers } from "./hooks";
+export { useGameState, useGameHandlers, useGameSocket } from "./hooks";
 
 // Results components
 export { Confetti, WinnerCard } from "./ResultsStatsCard";

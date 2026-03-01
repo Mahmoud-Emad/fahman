@@ -168,7 +168,7 @@ export function RoomLobbyScreen() {
 
     const unsubscribe = socketService.onGameStarted((data) => {
       if (data.roomId === roomId) {
-        navigation.replace("Gameplay", { roomId, roomCode, pack, isHost });
+        navigation.replace("RoomDetails", { roomId, isHost });
       }
     });
 

@@ -1,9 +1,11 @@
 /**
  * RoomDetailsScreen - Game room with questions and answers
- * Features: Question display, answer input, confidence betting, timer, lobby, chat
+ * Features: Multiple-choice questions, confidence betting, timer (server-driven),
+ *           auto-graded results, host-controlled progression, final scoreboard
  */
 import React from "react";
 import { ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { useRoute, type RouteProp } from "@react-navigation/native";
 import { BottomNavBar, LOBBY_TABS } from "@/components/navigation";
 import { LeaveConfirmDialog } from "@/components/common";
 import {
@@ -16,6 +18,7 @@ import {
   WaitingIndicator,
   useGameState,
   useGameHandlers,
+  useGameSocket,
 } from "@/components/game";
 import {
   NotificationsModal,
@@ -23,51 +26,71 @@ import {
   ChatDetailsModal,
 } from "@/components/messaging";
 import { useMessaging } from "@/hooks";
+import type { RootStackParamList } from "../../App";
+
+type RoomDetailsRouteProp = RouteProp<RootStackParamList, "RoomDetails">;
 
 /**
- * RoomDetailsScreen component
+ * RoomDetailsScreen component — connects socket events to game UI
  */
 export function RoomDetailsScreen() {
+  const route = useRoute<RoomDetailsRouteProp>();
+  const { roomId, isHost: routeIsHost } = route.params;
+
   // Use centralized messaging hook
   const messaging = useMessaging();
 
   // Game state management
   const gameState = useGameState({
+    isHost: routeIsHost ?? false,
     onBackPress: () => gameState.setShowLeaveDialog(true),
   });
 
-  // Game action handlers
-  const handlers = useGameHandlers({
-    // State values
-    answer: gameState.answer,
-    selectedBet: gameState.selectedBet,
-    hasSubmitted: gameState.hasSubmitted,
-    currentQuestion: gameState.currentQuestion,
-    totalQuestions: gameState.totalQuestions,
-    roomSettings: gameState.roomSettings,
+  // Socket-to-state bridge — subscribes to all game events
+  useGameSocket({
+    roomId,
     currentUserId: gameState.currentUserId,
-
-    // State setters
-    setHasSubmitted: gameState.setHasSubmitted,
     setGamePhase: gameState.setGamePhase,
-    setPlayers: gameState.setPlayers,
-    setMessages: gameState.setMessages,
-    setShowLeaveDialog: gameState.setShowLeaveDialog,
-    setUsedBets: gameState.setUsedBets,
+    setTotalQuestions: gameState.setTotalQuestions,
     setCurrentQuestion: gameState.setCurrentQuestion,
     setQuestionText: gameState.setQuestionText,
+    setQuestionId: gameState.setQuestionId,
+    setOptions: gameState.setOptions,
+    setQuestionType: gameState.setQuestionType,
     setTimeLeft: gameState.setTimeLeft,
-    setIsTimerActive: gameState.setIsTimerActive,
-    setAnswer: gameState.setAnswer,
+    setSelectedAnswer: gameState.setSelectedAnswer,
     setSelectedBet: gameState.setSelectedBet,
+    setHasSubmitted: gameState.setHasSubmitted,
+    setCorrectAnswer: gameState.setCorrectAnswer,
+    setQuestionResults: gameState.setQuestionResults,
+    setPlayersAnswered: gameState.setPlayersAnswered,
+    setTotalPlayers: gameState.setTotalPlayers,
+    setPlayerScore: gameState.setPlayerScore,
+    setPlayers: gameState.setPlayers,
+    setWinner: gameState.setWinner,
+    setFinalScores: gameState.setFinalScores,
+  });
 
-    // Messaging callbacks
+  // Game action handlers — wired to socket emissions
+  const handlers = useGameHandlers({
+    roomId,
+    selectedAnswer: gameState.selectedAnswer,
+    selectedBet: gameState.selectedBet,
+    hasSubmitted: gameState.hasSubmitted,
+    timeLeft: gameState.timeLeft,
+    roomSettings: gameState.roomSettings,
+    currentUserId: gameState.currentUserId,
+    setHasSubmitted: gameState.setHasSubmitted,
+    setShowLeaveDialog: gameState.setShowLeaveDialog,
+    setUsedBets: gameState.setUsedBets,
+    setPlayers: gameState.setPlayers,
+    setMessages: gameState.setMessages,
     onOpenNotifications: messaging.openNotifications,
     onOpenChatsList: messaging.openChatsList,
   });
 
-  const { gamePhase, hasSubmitted, isHost, answer, selectedBet } = gameState;
-  const canSubmit = answer.trim() !== "" && selectedBet !== null;
+  const { gamePhase, hasSubmitted, isHost, selectedAnswer, selectedBet } = gameState;
+  const canSubmit = selectedAnswer !== null && selectedBet !== null && !hasSubmitted;
 
   return (
     <KeyboardAvoidingView
@@ -90,36 +113,35 @@ export function RoomDetailsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Answering Phase */}
-        {gamePhase === "answering" && !hasSubmitted && (
+        {gamePhase === "answering" && (
           <AnsweringPhase
             timeLeft={gameState.timeLeft}
             questionText={gameState.questionText}
-            answer={gameState.answer}
-            onAnswerChange={gameState.setAnswer}
+            options={gameState.options}
+            selectedAnswer={gameState.selectedAnswer}
+            onSelectOption={gameState.setSelectedAnswer}
+            hasSubmitted={hasSubmitted}
             selectedBet={gameState.selectedBet}
             onBetSelect={gameState.setSelectedBet}
             betCards={gameState.betCards}
             usedBets={gameState.usedBets}
+            playersAnsweredCount={gameState.playersAnswered.length}
+            totalPlayers={gameState.totalPlayers}
           />
         )}
 
-        {/* Lobby Phase */}
+        {/* Lobby Phase — auto-graded results */}
         {gamePhase === "lobby" && (
           <LobbyPhase
             currentQuestion={gameState.currentQuestion}
             totalQuestions={gameState.totalQuestions}
             questionText={gameState.questionText}
-            hasSubmitted={hasSubmitted}
-            answer={gameState.answer}
-            selectedBet={gameState.selectedBet}
+            options={gameState.options}
+            correctAnswer={gameState.correctAnswer}
+            questionResults={gameState.questionResults}
             isHost={isHost}
-            players={gameState.players}
-            messages={gameState.messages}
-            currentUserId={gameState.currentUserId}
-            onSendMessage={handlers.handleSendMessage}
-            onPlayerAction={handlers.handlePlayerAction}
-            onMarkPlayer={handlers.handleMarkPlayer}
             onNextQuestion={handlers.handleNextQuestion}
+            currentUserId={gameState.currentUserId}
           />
         )}
 

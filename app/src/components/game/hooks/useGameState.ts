@@ -1,46 +1,61 @@
 /**
- * useGameState - Consolidated game state management
+ * useGameState - Game state management (socket-driven, no mock data)
  */
 import { useState, useEffect } from "react";
 import { BackHandler } from "react-native";
-import type { Player, ChatMessage, GamePhase, RoomSettings } from "../types";
+import type { Player, ChatMessage, GamePhase, GameState, PlayerResult, RoomSettings } from "../types";
 import { DEFAULT_ROOM_SETTINGS } from "../types";
+import { useAuth } from "@/hooks";
 
 interface UseGameStateOptions {
   initialSettings?: RoomSettings;
+  isHost?: boolean;
   onBackPress?: () => void;
 }
 
 /**
- * Hook for managing game state
+ * Hook for managing game state — all values are driven by socket events
  */
-export function useGameState(options: UseGameStateOptions = {}) {
-  const { initialSettings = DEFAULT_ROOM_SETTINGS, onBackPress } = options;
+export function useGameState(config: UseGameStateOptions = {}) {
+  const { initialSettings = DEFAULT_ROOM_SETTINGS, isHost: initialIsHost = false, onBackPress } = config;
+  const { user } = useAuth();
 
   // Room settings
   const [roomSettings] = useState<RoomSettings>(initialSettings);
 
   // Question state
-  const [currentQuestion, setCurrentQuestion] = useState(1);
-  const [totalQuestions] = useState(20);
-  const [questionText, setQuestionText] = useState("What duck says?");
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [questionText, setQuestionText] = useState("");
+  const [questionId, setQuestionId] = useState("");
+  const [options, setOptions] = useState<string[]>([]);
+  const [questionType, setQuestionType] = useState("SINGLE");
 
-  // Timer state
-  const [timeLeft, setTimeLeft] = useState(roomSettings.timerDuration);
-  const [isTimerActive, setIsTimerActive] = useState(true);
+  // Timer state (driven by server game:timerTick)
+  const [timeLeft, setTimeLeft] = useState(0);
 
-  // Game phase
-  const [gamePhase, setGamePhase] = useState<GamePhase>("answering");
+  // Game phase — starts at "waiting"
+  const [gamePhase, setGamePhase] = useState<GamePhase>("waiting");
 
   // Player answer state
-  const [answer, setAnswer] = useState("");
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [selectedBet, setSelectedBet] = useState<number | null>(null);
   const [usedBets, setUsedBets] = useState<number[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [playerScore, setPlayerScore] = useState(0);
 
+  // Results state
+  const [correctAnswer, setCorrectAnswer] = useState<number[] | null>(null);
+  const [questionResults, setQuestionResults] = useState<PlayerResult[] | null>(null);
+  const [playersAnswered, setPlayersAnswered] = useState<string[]>([]);
+  const [totalPlayers, setTotalPlayers] = useState(0);
+
   // Host state
-  const [isHost] = useState(false);
+  const [isHost] = useState(initialIsHost);
+
+  // Final results
+  const [winner, setWinner] = useState<GameState["winner"]>(null);
+  const [finalScores, setFinalScores] = useState<GameState["finalScores"]>([]);
 
   // Leave dialog state
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
@@ -49,8 +64,8 @@ export function useGameState(options: UseGameStateOptions = {}) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Current user ID (mock)
-  const currentUserId = "current-user";
+  // Real user ID
+  const currentUserId = user?.id ?? "";
 
   // Handle Android hardware back button
   useEffect(() => {
@@ -66,25 +81,7 @@ export function useGameState(options: UseGameStateOptions = {}) {
     return () => backHandler.remove();
   }, [onBackPress]);
 
-  // Timer countdown
-  useEffect(() => {
-    if (!isTimerActive || timeLeft <= 0 || gamePhase !== "answering") return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setIsTimerActive(false);
-          setGamePhase("lobby");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isTimerActive, timeLeft, gamePhase]);
-
-  // Generate bet cards based on maxBet setting
+  // Bet cards based on maxBet setting
   const betCards = Array.from({ length: roomSettings.maxBet }, (_, i) => i + 1);
 
   return {
@@ -95,22 +92,27 @@ export function useGameState(options: UseGameStateOptions = {}) {
     currentQuestion,
     setCurrentQuestion,
     totalQuestions,
+    setTotalQuestions,
     questionText,
     setQuestionText,
+    questionId,
+    setQuestionId,
+    options,
+    setOptions,
+    questionType,
+    setQuestionType,
 
     // Timer state
     timeLeft,
     setTimeLeft,
-    isTimerActive,
-    setIsTimerActive,
 
     // Game phase
     gamePhase,
     setGamePhase,
 
     // Player answer state
-    answer,
-    setAnswer,
+    selectedAnswer,
+    setSelectedAnswer,
     selectedBet,
     setSelectedBet,
     usedBets,
@@ -120,8 +122,24 @@ export function useGameState(options: UseGameStateOptions = {}) {
     playerScore,
     setPlayerScore,
 
+    // Results state
+    correctAnswer,
+    setCorrectAnswer,
+    questionResults,
+    setQuestionResults,
+    playersAnswered,
+    setPlayersAnswered,
+    totalPlayers,
+    setTotalPlayers,
+
     // Host state
     isHost,
+
+    // Final results
+    winner,
+    setWinner,
+    finalScores,
+    setFinalScores,
 
     // Leave dialog
     showLeaveDialog,

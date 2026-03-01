@@ -63,7 +63,7 @@ export type RootStackParamList = {
   CredentialLogin: { type: "id" | "phone" | "email" };
   ForgotPassword: undefined;
   Rooms: undefined;
-  RoomDetails: { roomId: string };
+  RoomDetails: { roomId: string; isHost?: boolean };
   RoomConfig: { pack: PackData };
   RoomLobby: { pack: PackData; config: RoomConfigData; isHost?: boolean; room?: Room };
   PackCreation: { packId?: string };
