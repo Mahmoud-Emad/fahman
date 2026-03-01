@@ -155,7 +155,7 @@ router.get('/me/achievements', authenticate, userController.getUserAchievements)
  *       401:
  *         description: Unauthorized
  */
-router.get('/:userId', authenticate, userController.getPublicProfile);
+router.get('/:userId', authenticate, validateUUID('userId'), userController.getPublicProfile);
 
 /**
  * @openapi
@@ -183,7 +183,7 @@ router.get('/:userId', authenticate, userController.getPublicProfile);
  *       401:
  *         description: Unauthorized
  */
-router.get('/:userId/stats', authenticate, userController.getOtherUserStats);
+router.get('/:userId/stats', authenticate, validateUUID('userId'), userController.getOtherUserStats);
 
 /**
  * @openapi
@@ -246,6 +246,6 @@ router.get('/:userId/games/recent', authenticate, validateUUID('userId'), valida
  *       401:
  *         description: Unauthorized
  */
-router.get('/:userId/achievements', authenticate, userController.getOtherUserAchievements);
+router.get('/:userId/achievements', authenticate, validateUUID('userId'), userController.getOtherUserAchievements);
 
 export default router;
