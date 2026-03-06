@@ -96,6 +96,8 @@ export type IconName =
   | "pause-outline"
   | "person-add"
   | "person-add-outline"
+  | "person-remove"
+  | "person-remove-outline"
   | "ban"
   | "ban-outline"
   | "information-circle"

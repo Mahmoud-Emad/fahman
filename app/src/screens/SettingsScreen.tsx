@@ -8,12 +8,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { RootStackParamList } from "../../App";
-import { Text, Icon, Skeleton } from "@/components/ui";
+import { Text, Icon, Skeleton, Divider } from "@/components/ui";
+import { BottomNavBar } from "@/components/navigation";
 import { ActionRow } from "@/components/settings";
 import { SoundsSection, PrivacySection, LanguageSection } from "@/components/settings/SettingsSections";
 import { colors } from "@/themes";
 import { settingsService, type UserSettings } from "@/services/settingsService";
-import { useAuth, useToast } from "@/contexts";
+import { useAuth, useToast, useMessaging } from "@/contexts";
 import { SOCKET_URL } from "@/config/env";
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -26,6 +27,7 @@ export function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
   const toast = useToast();
+  const { unreadNotificationCount, unreadMessageCount } = useMessaging();
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -151,8 +153,6 @@ export function SettingsScreen() {
             setIsLoggingOut(true);
             try {
               await logout();
-              // Navigation happens automatically via AuthStack swap
-              // when isAuthenticated changes to false
             } catch (error) {
               setIsLoggingOut(false);
               Alert.alert("Error", "Failed to log out. Please try again.");
@@ -180,9 +180,7 @@ export function SettingsScreen() {
             try {
               const response = await settingsService.deleteAccount();
               if (response.success) {
-                // Logout will clear storage and update auth state
                 await logout();
-                // Navigation happens automatically via AuthStack swap
               } else {
                 setIsDeleting(false);
                 Alert.alert("Error", response.message || "Failed to delete account. Please try again.");
@@ -197,32 +195,24 @@ export function SettingsScreen() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-surface-secondary">
-        {/* Header */}
-        <View
-          className="flex-row items-center px-4 py-3"
-          style={{
-            paddingTop: insets.top + 8,
-            backgroundColor: colors.primary[500],
-          }}
-        >
-          <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2">
-            <Icon name="chevron-back" color={colors.white} size="lg" />
-          </Pressable>
-          <Text
-            variant="h3"
-            className="flex-1 text-center mr-8"
-            style={{ color: colors.white }}
-          >
-            Settings
-          </Text>
-        </View>
+  // Bottom nav — navigate to screens that already host the modals
+  const handleTabPress = (tabId: string) => {
+    if (tabId === "home") {
+      navigation.navigate("Home" as never);
+    } else if (tabId === "friends" || tabId === "chats" || tabId === "notifications") {
+      navigation.navigate("Home" as never);
+    } else if (tabId === "profile") {
+      navigation.navigate("Profile");
+    }
+  };
 
+  // Render content based on state
+  const renderContent = () => {
+    if (isLoading) {
+      return (
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingTop: 12 }}
+          contentContainerStyle={{ paddingBottom: 100, paddingTop: 12 }}
           showsVerticalScrollIndicator={false}
         >
           {/* Skeleton for expandable panels */}
@@ -257,33 +247,11 @@ export function SettingsScreen() {
             </View>
           ))}
         </ScrollView>
-      </View>
-    );
-  }
+      );
+    }
 
-  if (loadError || !settings) {
-    return (
-      <View className="flex-1 bg-surface-secondary">
-        {/* Header */}
-        <View
-          className="flex-row items-center px-4 py-3"
-          style={{
-            paddingTop: insets.top + 8,
-            backgroundColor: colors.primary[500],
-          }}
-        >
-          <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2">
-            <Icon name="chevron-back" color={colors.white} size="lg" />
-          </Pressable>
-          <Text
-            variant="h3"
-            className="flex-1 text-center mr-8"
-            style={{ color: colors.white }}
-          >
-            Settings
-          </Text>
-        </View>
-
+    if (loadError || !settings) {
+      return (
         <View className="flex-1 items-center justify-center px-4">
           <Icon name="cloud-offline-outline" size="xl" color={colors.error} />
           <Text variant="h3" className="mt-4 mb-2 text-center">
@@ -308,35 +276,13 @@ export function SettingsScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
-    );
-  }
+      );
+    }
 
-  return (
-    <View className="flex-1 bg-surface-secondary">
-      {/* Header */}
-      <View
-        className="flex-row items-center px-4 py-3"
-        style={{
-          paddingTop: insets.top + 8,
-          backgroundColor: colors.primary[500],
-        }}
-      >
-        <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2">
-          <Icon name="chevron-back" color={colors.white} size="lg" />
-        </Pressable>
-        <Text
-          variant="h3"
-          className="flex-1 text-center mr-8"
-          style={{ color: colors.white }}
-        >
-          Settings
-        </Text>
-      </View>
-
+    return (
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingTop: 12 }}
+        contentContainerStyle={{ paddingBottom: 100, paddingTop: 12 }}
         showsVerticalScrollIndicator={false}
       >
         <SoundsSection settings={settings} updateSetting={updateSetting} />
@@ -414,6 +360,44 @@ export function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
+    );
+  };
+
+  return (
+    <View className="flex-1 bg-surface-secondary">
+      {/* Header */}
+      <View
+        className="flex-row items-center px-4 py-3"
+        style={{
+          paddingTop: insets.top + 8,
+          backgroundColor: colors.primary[500],
+        }}
+      >
+        <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2">
+          <Icon name="chevron-back" color={colors.white} size="lg" />
+        </Pressable>
+        <Text
+          variant="h3"
+          className="flex-1 text-center mr-8"
+          style={{ color: colors.white }}
+        >
+          Settings
+        </Text>
+      </View>
+
+      {/* Content */}
+      {renderContent()}
+
+      {/* Bottom Navigation Bar */}
+      <BottomNavBar
+        centerTab={{ id: "home", label: "Home", icon: "home-outline", activeIcon: "home" }}
+        activeTab=""
+        onTabPress={handleTabPress}
+        badges={{
+          notifications: unreadNotificationCount,
+          chats: unreadMessageCount,
+        }}
+      />
     </View>
   );
 }

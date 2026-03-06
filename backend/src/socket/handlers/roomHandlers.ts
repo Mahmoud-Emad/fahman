@@ -53,14 +53,6 @@ export function registerRoomHandlers(
       socket.join(roomId);
       socket.roomIds.add(roomId);
 
-      // Update presence in database - mark as present
-      await prisma.roomMember.update({
-        where: { id: member.id },
-        data: {
-          lastSeenAt: new Date(),
-        },
-      });
-
       // Build member list
       const members: RoomMemberInfo[] = member.room.members.map((m) => ({
         id: m.user.id,
@@ -95,18 +87,6 @@ export function registerRoomHandlers(
     try {
       socket.leave(roomId);
       socket.roomIds.delete(roomId);
-
-      // Update presence in database
-      await prisma.roomMember.updateMany({
-        where: {
-          roomId,
-          userId: socket.userId,
-          isActive: true,
-        },
-        data: {
-          lastSeenAt: new Date(),
-        },
-      });
 
       socket.emit('room:left', { roomId });
 

@@ -4,6 +4,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { RoomData, EventData } from "../types";
 import { roomsService, type Room } from "@/services/roomsService";
+import { socketService } from "@/services/socketService";
 import { PAGINATION } from "@/constants";
 import { transformUrl } from "@/utils/transformUrl";
 
@@ -153,6 +154,39 @@ export function useRoomData(): UseRoomDataReturn {
     loadRooms();
   }, []);
 
+  // Listen for real-time room list updates (player join/leave/room close)
+  useEffect(() => {
+    const updateRoomInList = (data: { roomId: string; currentPlayers: number; status: string }) => {
+      const statusMap: Record<string, RoomData["status"]> = {
+        WAITING: "waiting",
+        PLAYING: "playing",
+        FINISHED: "finished",
+        CLOSED: "finished",
+      };
+      const uiStatus = statusMap[data.status] || "finished";
+
+      const updater = (prev: RoomData[]) => {
+        // If room is closed, remove it from the list
+        if (data.status === "CLOSED") {
+          return prev.filter((r) => r.id !== data.roomId);
+        }
+        // Otherwise update player count and status
+        return prev.map((r) =>
+          r.id === data.roomId
+            ? { ...r, totalUsers: data.currentPlayers, status: uiStatus }
+            : r
+        );
+      };
+
+      setRooms(updater);
+      setExploreRooms(updater);
+      setMyRooms(updater);
+    };
+
+    const unsub = socketService.onRoomListUpdate(updateRoomInList);
+    return unsub;
+  }, []);
+
   // Refresh handler
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -187,6 +221,15 @@ export function useRoomData(): UseRoomDataReturn {
     [loadMoreRooms, loadingMore, refreshing]
   );
 
+  // Silent refresh — re-fetches all data without showing loading indicators
+  const refreshSilently = useCallback(async () => {
+    await Promise.all([
+      fetchPopularRooms(),
+      fetchExploreRooms(1),
+      fetchMyRooms(),
+    ]);
+  }, [fetchMyRooms]);
+
   return {
     events,
     rooms,
@@ -200,5 +243,6 @@ export function useRoomData(): UseRoomDataReturn {
     loadMoreRooms,
     handleScrollEnd,
     fetchMyRooms,
+    refreshSilently,
   };
 }

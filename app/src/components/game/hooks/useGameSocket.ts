@@ -10,8 +10,9 @@ import {
   type QuestionResultsData,
   type GameFinishedData,
   type PlayerScore,
+  type ChatMessage as SocketChatMessage,
 } from "@/services/socketService";
-import type { GamePhase, PlayerResult } from "../types";
+import type { GamePhase, PlayerResult, ChatMessage } from "../types";
 import type { Player } from "@/components/lobby/types";
 
 interface UseGameSocketOptions {
@@ -51,6 +52,7 @@ interface UseGameSocketOptions {
     score: number;
     rank: number;
   }[]) => void;
+  setMessages: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void;
 }
 
 /**
@@ -79,6 +81,7 @@ export function useGameSocket({
   setPlayers,
   setWinner,
   setFinalScores,
+  setMessages,
 }: UseGameSocketOptions) {
   useEffect(() => {
     if (!roomId) return;
@@ -196,6 +199,32 @@ export function useGameSocket({
       setGamePhase("results");
     });
 
+    // chat:message — incoming chat message from other players
+    const unsubChat = socketService.onChatMessage((data: SocketChatMessage) => {
+      if (data.roomId !== roomId) return;
+      // Skip own messages (already added locally by handleSendMessage)
+      if (data.senderId === currentUserId) return;
+
+      const senderName = data.senderName || "Unknown";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: data.id,
+          senderId: data.senderId,
+          senderName,
+          senderInitials: senderName
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .toUpperCase()
+            .slice(0, 2),
+          message: data.text,
+          timestamp: data.timestamp,
+          type: data.type === "SYSTEM" ? "system" : "user",
+        },
+      ]);
+    });
+
     return () => {
       unsubStarted();
       unsubQuestion();
@@ -204,6 +233,7 @@ export function useGameSocket({
       unsubResults();
       unsubScores();
       unsubFinished();
+      unsubChat();
     };
   }, [
     roomId,
@@ -227,5 +257,6 @@ export function useGameSocket({
     setPlayers,
     setWinner,
     setFinalScores,
+    setMessages,
   ]);
 }

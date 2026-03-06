@@ -6,7 +6,7 @@
 import { Response, NextFunction } from 'express';
 import roomService from '../services/roomService';
 import roomMembersService from '../services/roomMembersService';
-import { emitGameStarted, emitPlayerKicked, emitRoomClosed } from '../socket';
+import { emitGameStarted, emitPlayerKicked, emitPlayerLeft, emitRoomClosed, emitRoomListUpdate } from '../socket';
 import { successResponse, paginatedResponse } from '../utils/responseFormatter';
 import { AuthRequest } from '../types';
 
@@ -54,6 +54,23 @@ export async function getPopularRooms(req: AuthRequest, res: Response, next: Nex
 }
 
 /**
+ * Search rooms by title or code
+ */
+export async function searchRooms(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { q, limit } = req.query;
+    const query = (q as string || '').trim();
+    if (!query) {
+      return res.json(successResponse([]));
+    }
+    const rooms = await roomService.searchRooms(query, parseInt(limit as string) || 20);
+    res.json(successResponse(rooms));
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * Get room by ID
  */
 export async function getRoomById(req: AuthRequest, res: Response, next: NextFunction) {
@@ -84,6 +101,7 @@ export async function joinRoom(req: AuthRequest, res: Response, next: NextFuncti
   try {
     const { password } = req.body;
     const result = await roomMembersService.joinRoom(req.user.id, req.params.id, password);
+    emitRoomListUpdate(req.params.id, result.room.currentPlayers, result.room.status);
     res.json(successResponse(result, 'Joined room successfully'));
   } catch (error) {
     next(error);
@@ -97,6 +115,7 @@ export async function joinRoomByCode(req: AuthRequest, res: Response, next: Next
   try {
     const { roomCode, password } = req.body;
     const result = await roomMembersService.joinRoomByCode(req.user.id, roomCode, password);
+    emitRoomListUpdate(result.room.id, result.room.currentPlayers, result.room.status);
     res.json(successResponse(result, 'Joined room successfully'));
   } catch (error) {
     next(error);
@@ -109,6 +128,14 @@ export async function joinRoomByCode(req: AuthRequest, res: Response, next: Next
 export async function leaveRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const result = await roomMembersService.leaveRoom(req.user.id, req.params.id);
+
+    if (result.closed) {
+      emitRoomClosed(req.params.id, 'Host ended the room');
+    } else {
+      emitPlayerLeft(req.params.id, req.user.id);
+    }
+    emitRoomListUpdate(req.params.id, result.currentPlayers, result.status);
+
     const message = result.closed ? 'Room closed' : 'Left room successfully';
     res.json(successResponse(result, message));
   } catch (error) {
@@ -123,6 +150,7 @@ export async function kickPlayer(req: AuthRequest, res: Response, next: NextFunc
   try {
     const result = await roomMembersService.kickPlayer(req.user.id, req.params.id, req.params.userId);
     emitPlayerKicked(req.params.id, req.params.userId, 'Kicked by room host');
+    emitRoomListUpdate(req.params.id, result.currentPlayers, result.status);
     res.json(successResponse(result, 'Player kicked successfully'));
   } catch (error) {
     next(error);

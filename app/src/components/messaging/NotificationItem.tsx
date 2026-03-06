@@ -90,6 +90,32 @@ function renderRightActions(
 }
 
 /**
+ * Status label shown after an action has been taken
+ */
+function ActionTakenLabel({ action }: { action: string }) {
+  const labelMap: Record<string, { text: string; color: string; icon: string }> = {
+    accepted: { text: "Accepted", color: colors.success, icon: "checkmark-circle" },
+    declined: { text: "Declined", color: colors.neutral[400], icon: "close-circle" },
+    joined: { text: "Joined", color: colors.primary[500], icon: "enter" },
+  };
+
+  const info = labelMap[action] || { text: action, color: colors.neutral[400], icon: "ellipse" };
+
+  return (
+    <View className="mt-2 flex-row items-center gap-1">
+      <Icon name={info.icon as any} customSize={14} color={info.color} />
+      <Text
+        variant="caption"
+        className="font-medium"
+        style={{ color: info.color, fontSize: 12 }}
+      >
+        {info.text}
+      </Text>
+    </View>
+  );
+}
+
+/**
  * NotificationItem component
  */
 export function NotificationItem({
@@ -185,8 +211,8 @@ export function NotificationItem({
           {message}
         </Text>
 
-        {/* Action Buttons - Friend Request */}
-        {type === "friend_request" && onAction && (
+        {/* Action Buttons - Friend Request (only when no action taken) */}
+        {!notification.actionTaken && type === "friend_request" && onAction && (
           <View className="mt-3 flex-row items-center gap-2">
             <Pressable
               onPress={() => onAction("decline")}
@@ -207,8 +233,8 @@ export function NotificationItem({
           </View>
         )}
 
-        {/* Action Button - Room Invite */}
-        {type === "room_invite" && onAction && (
+        {/* Action Button - Room Invite (only when no action taken) */}
+        {!notification.actionTaken && type === "room_invite" && onAction && (
           <View className="mt-3">
             <Pressable
               onPress={() => onAction("join")}
@@ -225,6 +251,11 @@ export function NotificationItem({
               </Text>
             </Pressable>
           </View>
+        )}
+
+        {/* Action taken status label */}
+        {notification.actionTaken && (
+          <ActionTakenLabel action={notification.actionTaken} />
         )}
       </View>
     </Pressable>

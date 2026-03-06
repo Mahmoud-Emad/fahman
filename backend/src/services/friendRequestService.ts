@@ -6,7 +6,7 @@
 import { prisma } from '../config/database';
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
 import notificationService from './notificationService';
-import { sendNotificationToUser, emitFriendshipAccepted } from '../socket';
+import { sendNotificationToUser, sendNotificationUpdate, emitFriendshipAccepted } from '../socket';
 
 export class FriendRequestService {
   /**
@@ -171,6 +171,12 @@ export class FriendRequestService {
       },
     });
 
+    // Resolve the FRIEND_REQUEST notification for the acceptor
+    const resolved = await notificationService.resolveByContext(userId, request.userId, 'FRIEND_REQUEST', 'accepted');
+    if (resolved) {
+      sendNotificationUpdate(userId, { id: resolved.id, actionTaken: 'accepted' });
+    }
+
     // Notify the original sender that their request was accepted
     const notification = await notificationService.createFriendAcceptedNotification(request.userId, userId);
     if (notification) {
@@ -211,6 +217,12 @@ export class FriendRequestService {
         respondedAt: new Date(),
       },
     });
+
+    // Resolve the FRIEND_REQUEST notification for the decliner
+    const resolved = await notificationService.resolveByContext(userId, request.userId, 'FRIEND_REQUEST', 'declined');
+    if (resolved) {
+      sendNotificationUpdate(userId, { id: resolved.id, actionTaken: 'declined' });
+    }
 
     return { success: true };
   }

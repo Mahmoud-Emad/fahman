@@ -338,7 +338,6 @@ export function RoomSearchModal({
       visible={visible}
       onClose={handleClose}
       title="Search"
-      maxHeight="85%"
       padding="p-0"
     >
       {/* Search Section */}

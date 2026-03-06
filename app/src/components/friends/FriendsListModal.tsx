@@ -111,7 +111,6 @@ export function FriendsListModal({
       visible={visible}
       onClose={onClose}
       title="Friends"
-      maxHeight="85%"
       padding="p-0"
     >
       {/* Tabs */}
@@ -138,8 +137,8 @@ export function FriendsListModal({
         </View>
       )}
 
-      {/* Content - fixed height ensures consistent modal size during loading/empty states */}
-      <View style={{ height: 400 }}>
+      {/* Content */}
+      <View style={{ flex: 1 }}>
         {/* Loading skeleton with fade out */}
         <Animated.View
           style={{

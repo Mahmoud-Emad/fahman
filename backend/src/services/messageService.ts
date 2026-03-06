@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '../config/database';
-import { MessageType, FriendshipStatus } from '@prisma/client';
+import { MessageType, FriendshipStatus, RoomStatus } from '@prisma/client';
 import { AppError } from '../utils/errors';
 
 interface SendMessageInput {
@@ -38,10 +38,10 @@ class MessageService {
    * Get all conversations for a user (grouped DMs)
    */
   async getConversations(userId: string): Promise<ConversationPreview[]> {
-    // Get all DM messages involving this user
+    // Get all DM messages involving this user (including room invites)
     const messages = await prisma.message.findMany({
       where: {
-        messageType: MessageType.PRIVATE,
+        messageType: { in: [MessageType.PRIVATE, MessageType.ROOM_INVITE] },
         OR: [{ senderId: userId }, { recipientId: userId }],
       },
       include: {
@@ -69,7 +69,7 @@ class MessageService {
           where: {
             senderId: otherId,
             recipientId: userId,
-            messageType: MessageType.PRIVATE,
+            messageType: { in: [MessageType.PRIVATE, MessageType.ROOM_INVITE] },
             isRead: false,
           },
         });
@@ -106,9 +106,9 @@ class MessageService {
   }> {
     const { limit = 50, before } = options;
 
-    // Build where clause
+    // Build where clause — include both PRIVATE and ROOM_INVITE messages
     const where: any = {
-      messageType: MessageType.PRIVATE,
+      messageType: { in: [MessageType.PRIVATE, MessageType.ROOM_INVITE] },
       OR: [
         { senderId: userId, recipientId: otherUserId },
         { senderId: otherUserId, recipientId: userId },
@@ -142,8 +142,58 @@ class MessageService {
       messages.pop(); // Remove the extra message
     }
 
+    const orderedMessages = messages.reverse(); // Return in chronological order
+
+    // Enrich ROOM_INVITE messages with live room status
+    const inviteMessages = orderedMessages.filter(
+      (m) => m.messageType === MessageType.ROOM_INVITE && m.metadata
+    );
+    const roomCodes = [
+      ...new Set(
+        inviteMessages
+          .map((m) => (m.metadata as { roomCode?: string })?.roomCode)
+          .filter((code): code is string => !!code)
+      ),
+    ];
+
+    let roomMap = new Map<string, { status: RoomStatus; currentPlayers: number; maxPlayers: number }>();
+    if (roomCodes.length > 0) {
+      const rooms = await prisma.room.findMany({
+        where: { code: { in: roomCodes } },
+        select: { code: true, status: true, currentPlayers: true, maxPlayers: true },
+      });
+      roomMap = new Map(rooms.map((r) => [r.code, r]));
+    }
+
+    const enrichedMessages = orderedMessages.map((m) => {
+      if (m.messageType !== MessageType.ROOM_INVITE || !m.metadata) return m;
+
+      const roomCode = (m.metadata as { roomCode?: string })?.roomCode;
+      if (!roomCode) return m;
+
+      const room = roomMap.get(roomCode);
+      if (!room) {
+        return { ...m, roomStatus: { isActive: false, expiredReason: 'deleted', currentPlayers: 0, maxPlayers: 0 } };
+      }
+
+      if (room.status === RoomStatus.PLAYING) {
+        return { ...m, roomStatus: { isActive: false, expiredReason: 'in_progress', currentPlayers: room.currentPlayers, maxPlayers: room.maxPlayers } };
+      }
+      if (room.status === RoomStatus.FINISHED) {
+        return { ...m, roomStatus: { isActive: false, expiredReason: 'finished', currentPlayers: room.currentPlayers, maxPlayers: room.maxPlayers } };
+      }
+      if (room.status === RoomStatus.CLOSED) {
+        return { ...m, roomStatus: { isActive: false, expiredReason: 'closed', currentPlayers: room.currentPlayers, maxPlayers: room.maxPlayers } };
+      }
+      if (room.currentPlayers >= room.maxPlayers) {
+        return { ...m, roomStatus: { isActive: false, expiredReason: 'full', currentPlayers: room.currentPlayers, maxPlayers: room.maxPlayers } };
+      }
+
+      return { ...m, roomStatus: { isActive: true, expiredReason: null, currentPlayers: room.currentPlayers, maxPlayers: room.maxPlayers } };
+    });
+
     return {
-      messages: messages.reverse(), // Return in chronological order
+      messages: enrichedMessages,
       hasMore,
     };
   }
@@ -265,8 +315,9 @@ class MessageService {
         data: {
           senderId,
           recipientId,
-          text: `${sender.displayName || sender.username} invited you to join room "${roomTitle}" (Code: ${roomCode})`,
+          text: `Hey! Come join me and play ${roomTitle}!`,
           messageType: MessageType.ROOM_INVITE,
+          metadata: { roomCode, roomTitle },
         },
         include: {
           sender: {
@@ -370,7 +421,7 @@ class MessageService {
       where: {
         senderId: otherUserId,
         recipientId: userId,
-        messageType: MessageType.PRIVATE,
+        messageType: { in: [MessageType.PRIVATE, MessageType.ROOM_INVITE] },
         isRead: false,
       },
       data: { isRead: true },
@@ -386,7 +437,7 @@ class MessageService {
     return prisma.message.count({
       where: {
         recipientId: userId,
-        messageType: MessageType.PRIVATE,
+        messageType: { in: [MessageType.PRIVATE, MessageType.ROOM_INVITE] },
         isRead: false,
       },
     });

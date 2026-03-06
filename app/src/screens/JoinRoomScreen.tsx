@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon, Avatar, Input, Button } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import { useToast } from "@/contexts";
+import { useAuth } from "@/hooks";
 import { roomsService } from "@/services/roomsService";
 import type { RootStackParamList } from "../../App";
 import type { RoomData, RoomUser } from "@/components/rooms/types";
@@ -96,6 +97,7 @@ export function JoinRoomScreen() {
   const route = useRoute<JoinRoomScreenRouteProp>();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const { user } = useAuth();
 
   const { room, roomCode, password: prefilledPassword } = route.params;
 
@@ -118,31 +120,32 @@ export function JoinRoomScreen() {
     setIsJoining(true);
 
     try {
-      // Call backend API to join room
-      const response = await roomsService.joinRoom(
-        room.id,
-        isPrivate ? { password: password.trim() } : undefined
-      );
+      // Use joinRoomByCode when room ID is unavailable (e.g. chat invite)
+      const response = room.id && room.id.length > 10
+        ? await roomsService.joinRoom(room.id, isPrivate ? { password: password.trim() } : undefined)
+        : await roomsService.joinRoomByCode(roomCode || "", isPrivate ? password.trim() : undefined);
 
       if (response.success && response.data) {
+        const joinedRoom = response.data.room;
         // Navigate to RoomLobby with actual backend data
         navigation.replace("RoomLobby", {
           pack: {
-            id: response.data.room.selectedPack?.id || room.id,
-            title: response.data.room.selectedPack?.title || room.title,
+            id: joinedRoom.selectedPack?.id || room.id,
+            title: joinedRoom.selectedPack?.title || room.title,
             questionsCount: room.questionsCount,
-            isPublic: response.data.room.isPublic,
+            isPublic: joinedRoom.isPublic,
           },
           config: {
-            packId: response.data.room.selectedPack?.id || room.id,
-            title: response.data.room.title,
-            description: response.data.room.description || "",
-            maxPlayers: response.data.room.maxPlayers,
-            isPublic: response.data.room.isPublic,
-            isPasswordProtected: !response.data.room.isPublic,
-            password: isPrivate ? password : undefined,
+            packId: joinedRoom.selectedPack?.id || room.id,
+            title: joinedRoom.title,
+            description: joinedRoom.description || "",
+            maxPlayers: joinedRoom.maxPlayers,
+            isPublic: joinedRoom.isPublic,
+            isPasswordProtected: !joinedRoom.isPublic,
+            password: isPrivate ? password : "",
           },
           isHost: response.data.member.role === 'CREATOR',
+          room: joinedRoom,
         });
       } else {
         setError(response.message || "Failed to join room");
@@ -150,7 +153,55 @@ export function JoinRoomScreen() {
       }
     } catch (error: any) {
       // Handle specific error cases
-      if (error.message?.includes("password") || error.message?.includes("incorrect")) {
+      if (error.message?.includes("already in this room")) {
+        // User is already a member — fetch real room data, then navigate
+        toast.info("Rejoining room...");
+
+        let actualMaxPlayers = room.maxPlayers ?? 50;
+        let actualIsHost = false;
+        let actualCode = roomCode || "";
+
+        try {
+          const roomRes = await roomsService.getRoom(room.id);
+          if (roomRes.success && roomRes.data) {
+            const actual = roomRes.data;
+            actualMaxPlayers = actual.maxPlayers ?? actualMaxPlayers;
+            actualCode = actual.code || actualCode;
+
+            if (actual.creator?.id === user?.id) {
+              actualIsHost = true;
+            } else if (actual.members) {
+              const self = actual.members.find((m) => m.user.id === user?.id);
+              if (self?.role === "CREATOR") {
+                actualIsHost = true;
+              }
+            }
+          }
+        } catch {
+          // Fall through with defaults — RoomLobbyScreen will self-correct via its own REST fetch
+        }
+
+        navigation.replace("RoomLobby", {
+          pack: {
+            id: room.id,
+            title: room.title,
+            questionsCount: room.questionsCount,
+            isPublic: room.type === "public",
+          },
+          config: {
+            packId: room.id,
+            title: room.title,
+            description: room.description || "",
+            maxPlayers: actualMaxPlayers,
+            isPublic: room.type === "public",
+            isPasswordProtected: room.type === "private",
+            password: "",
+          },
+          isHost: actualIsHost,
+          room: { id: room.id, code: actualCode },
+        });
+        return;
+      } else if (error.message?.includes("password") || error.message?.includes("incorrect")) {
         setError("Incorrect password. Please try again.");
         toast.error("Incorrect password. Please try again.");
       } else if (error.message?.includes("full")) {

@@ -5,3 +5,4 @@
 backend.log
 app.log
 .claude/
+.DS_Store

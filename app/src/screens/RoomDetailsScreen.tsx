@@ -3,10 +3,11 @@
  * Features: Multiple-choice questions, confidence betting, timer (server-driven),
  *           auto-graded results, host-controlled progression, final scoreboard
  */
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import { useRoute, type RouteProp } from "@react-navigation/native";
-import { BottomNavBar, LOBBY_TABS } from "@/components/navigation";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { StackNavigationProp } from "@react-navigation/stack";
+import { BottomNavBar } from "@/components/navigation";
 import { LeaveConfirmDialog } from "@/components/common";
 import {
   GameHeader,
@@ -25,26 +26,112 @@ import {
   ChatsListModal,
   ChatDetailsModal,
 } from "@/components/messaging";
-import { useMessaging } from "@/hooks";
+import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
+import { useMessaging, useFriends, useRoomPresence } from "@/hooks";
+import { useToast } from "@/contexts";
+import { roomsService } from "@/services/roomsService";
+import type { RoomMemberInfo } from "@/services/socketService";
 import type { RootStackParamList } from "../../App";
 
+function getInitials(name: string): string {
+  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+}
+
 type RoomDetailsRouteProp = RouteProp<RootStackParamList, "RoomDetails">;
+type RoomDetailsNavigationProp = StackNavigationProp<RootStackParamList, "RoomDetails">;
 
 /**
  * RoomDetailsScreen component — connects socket events to game UI
  */
 export function RoomDetailsScreen() {
   const route = useRoute<RoomDetailsRouteProp>();
+  const navigation = useNavigation<RoomDetailsNavigationProp>();
+  const toast = useToast();
   const { roomId, isHost: routeIsHost } = route.params;
 
-  // Use centralized messaging hook
+  // Use centralized hooks
   const messaging = useMessaging();
+  const friendsHook = useFriends();
 
   // Game state management
   const gameState = useGameState({
     isHost: routeIsHost ?? false,
     onBackPress: () => gameState.setShowLeaveDialog(true),
   });
+
+  // Room presence — join socket room and track players in real-time
+  useRoomPresence({
+    roomId,
+    enabled: !!roomId,
+    onRoomJoined: (members: RoomMemberInfo[]) => {
+      gameState.setPlayers(
+        members.map((m) => ({
+          id: m.id,
+          name: m.displayName || m.username,
+          initials: getInitials(m.displayName || m.username),
+          avatar: m.avatar || undefined,
+          score: m.score,
+          hasAnswered: false,
+        }))
+      );
+      gameState.setTotalPlayers(members.length);
+    },
+    onPlayerJoined: (player: RoomMemberInfo) => {
+      gameState.setPlayers((prev) => {
+        if (prev.some((p) => p.id === player.id)) return prev;
+        return [
+          ...prev,
+          {
+            id: player.id,
+            name: player.displayName || player.username,
+            initials: getInitials(player.displayName || player.username),
+            avatar: player.avatar || undefined,
+            score: player.score,
+            hasAnswered: false,
+          },
+        ];
+      });
+      gameState.setTotalPlayers((prev) => prev + 1);
+    },
+    onPlayerLeft: (playerId: string) => {
+      gameState.setPlayers((prev) => prev.filter((p) => p.id !== playerId));
+      gameState.setTotalPlayers((prev) => Math.max(0, prev - 1));
+    },
+    onRoomClosed: (reason: string) => {
+      toast.error(`Room closed: ${reason}`);
+      navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+    },
+    onKicked: (reason: string) => {
+      toast.error(`You were kicked: ${reason}`);
+      navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+    },
+  });
+
+  // REST API fallback — fetch initial room members (guarantees data even if socket is slow)
+  useEffect(() => {
+    if (!roomId) return;
+
+    roomsService.getRoom(roomId).then((res) => {
+      if (res.success && res.data?.members) {
+        gameState.setPlayers((prev) => {
+          // Only populate if players list is still empty (socket hasn't delivered yet)
+          if (prev.length > 0) return prev;
+          return res.data!.members!.map((m) => ({
+            id: m.user.id,
+            name: m.user.displayName || m.user.username,
+            initials: getInitials(m.user.displayName || m.user.username),
+            avatar: m.user.avatar || undefined,
+            score: m.score,
+            hasAnswered: false,
+          }));
+        });
+        gameState.setTotalPlayers((prev) => {
+          if (prev > 0) return prev;
+          return res.data!.members!.length;
+        });
+      }
+    }).catch(() => {});
+  }, [roomId]);
 
   // Socket-to-state bridge — subscribes to all game events
   useGameSocket({
@@ -69,7 +156,39 @@ export function RoomDetailsScreen() {
     setPlayers: gameState.setPlayers,
     setWinner: gameState.setWinner,
     setFinalScores: gameState.setFinalScores,
+    setMessages: gameState.setMessages,
   });
+
+  // REST fallback — if still in "waiting" phase after 3s, fetch game state from API
+  // Handles race condition where game:question socket event fires before listeners are ready
+  const gamePhaseRef = useRef(gameState.gamePhase);
+  gamePhaseRef.current = gameState.gamePhase;
+
+  useEffect(() => {
+    if (!roomId) return;
+
+    const timer = setTimeout(() => {
+      if (gamePhaseRef.current !== "waiting") return;
+
+      roomsService.getGameState(roomId).then((res) => {
+        if (!res.success || !res.data) return;
+        const { currentQuestion, totalQuestions, currentQuestionIndex, status } = res.data;
+
+        if (status === "PLAYING" && currentQuestion) {
+          gameState.setCurrentQuestion(currentQuestionIndex + 1);
+          gameState.setTotalQuestions(totalQuestions);
+          gameState.setQuestionText(currentQuestion.text);
+          gameState.setQuestionId(currentQuestion.id);
+          gameState.setOptions(currentQuestion.options as string[]);
+          gameState.setQuestionType(currentQuestion.questionType);
+          gameState.setTimeLeft(currentQuestion.timeLimit);
+          gameState.setGamePhase("answering");
+        }
+      }).catch(() => {});
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [roomId]);
 
   // Game action handlers — wired to socket emissions
   const handlers = useGameHandlers({
@@ -87,7 +206,20 @@ export function RoomDetailsScreen() {
     setMessages: gameState.setMessages,
     onOpenNotifications: messaging.openNotifications,
     onOpenChatsList: messaging.openChatsList,
+    onOpenFriendsList: friendsHook.openFriendsList,
   });
+
+  // Intercept hardware back button and swipe gesture to show leave dialog
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      // Block GO_BACK (hardware back button)
+      // Allow RESET, REPLACE, NAVIGATE (programmatic navigation)
+      if (e.data.action.type !== "GO_BACK") return;
+      e.preventDefault();
+      gameState.setShowLeaveDialog(true);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const { gamePhase, hasSubmitted, isHost, selectedAnswer, selectedBet } = gameState;
   const canSubmit = selectedAnswer !== null && selectedBet !== null && !hasSubmitted;
@@ -145,16 +277,8 @@ export function RoomDetailsScreen() {
           />
         )}
 
-        {/* Waiting Phase */}
-        {gamePhase === "waiting" && (
-          <WaitingPhase
-            players={gameState.players}
-            messages={gameState.messages}
-            currentUserId={gameState.currentUserId}
-            onSendMessage={handlers.handleSendMessage}
-            onPlayerAction={handlers.handlePlayerAction}
-          />
-        )}
+        {/* Waiting Phase — loading screen before first question */}
+        {gamePhase === "waiting" && <WaitingPhase />}
 
         {/* Results Phase */}
         {gamePhase === "results" && (
@@ -175,7 +299,7 @@ export function RoomDetailsScreen() {
 
       {/* Bottom Navigation Bar */}
       <BottomNavBar
-        tabs={LOBBY_TABS}
+        centerTab={{ id: "rooms", label: "Rooms", icon: "game-controller-outline", activeIcon: "game-controller" }}
         activeTab=""
         onTabPress={handlers.handleBottomTabPress}
         badges={{
@@ -189,6 +313,21 @@ export function RoomDetailsScreen() {
         visible={gameState.showLeaveDialog}
         onClose={() => gameState.setShowLeaveDialog(false)}
         onConfirm={handlers.handleLeaveRoom}
+        {...(isHost && gameState.players.length > 1 && {
+          title: "End Room for All?",
+          message: "Ending the room will remove all players and close the room. This cannot be undone.",
+        })}
+      />
+
+      {/* Remove Friend Confirmation Dialog */}
+      <LeaveConfirmDialog
+        visible={handlers.removeFriendConfirm.visible}
+        onClose={handlers.cancelRemoveFriend}
+        onConfirm={handlers.confirmRemoveFriend}
+        title="Remove Friend?"
+        message="Are you sure you want to remove this player from your friends?"
+        confirmLabel="Remove"
+        icon="person-remove"
       />
 
       {/* Notifications Modal */}
@@ -224,6 +363,38 @@ export function RoomDetailsScreen() {
         onJoinRoom={messaging.handleJoinRoomFromChat}
         currentUserId={messaging.currentUserId}
         onBack={messaging.handleChatDetailsBack}
+      />
+
+      {/* Friends List Modal */}
+      <FriendsListModal
+        visible={friendsHook.friendsListVisible}
+        onClose={() => friendsHook.setFriendsListVisible(false)}
+        friends={friendsHook.friends}
+        friendRequests={friendsHook.friendRequests}
+        sentRequests={friendsHook.sentRequests}
+        onFriendPress={friendsHook.handleFriendPress}
+        onMessageFriend={friendsHook.handleMessageFriend}
+        onInviteFriend={friendsHook.handleInviteFriend}
+        onAcceptRequest={friendsHook.handleAcceptFriendRequest}
+        onDeclineRequest={friendsHook.handleDeclineFriendRequest}
+        onCancelRequest={friendsHook.handleCancelFriendRequest}
+        onAddFriend={friendsHook.handleAddFriend}
+        isLoading={friendsHook.friendsLoading}
+      />
+
+      {/* Add Friend Modal */}
+      <AddFriendModal
+        visible={friendsHook.addFriendVisible}
+        onClose={() => friendsHook.setAddFriendVisible(false)}
+        onCloseAll={friendsHook.closeAllModals}
+        onFriendAdded={friendsHook.handleFriendAdded}
+      />
+
+      {/* Create Game Dialog (Play with Friend) */}
+      <CreateGameDialog
+        visible={!!friendsHook.playFriend}
+        friend={friendsHook.playFriend}
+        onClose={() => friendsHook.setPlayFriend(null)}
       />
     </KeyboardAvoidingView>
   );

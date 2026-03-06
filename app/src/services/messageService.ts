@@ -13,6 +13,13 @@ export interface Message {
   roomId: string | null;
   text: string;
   messageType: 'ROOM' | 'PRIVATE' | 'SYSTEM' | 'ROOM_INVITE';
+  metadata?: { roomCode?: string; roomTitle?: string } | null;
+  roomStatus?: {
+    isActive: boolean;
+    expiredReason: 'deleted' | 'full' | 'in_progress' | 'finished' | 'closed' | null;
+    currentPlayers: number;
+    maxPlayers: number;
+  };
   isRead: boolean;
   createdAt: string;
   sender?: {

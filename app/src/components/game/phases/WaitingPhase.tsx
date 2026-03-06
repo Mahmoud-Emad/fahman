@@ -1,55 +1,103 @@
 /**
- * WaitingPhase - Waiting for game to start
+ * WaitingPhase - Loading screen while first question is being prepared
+ * Shown briefly between lobby → first question arrival via socket
  */
-import React from "react";
-import { View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Animated, Easing } from "react-native";
 import { Text, Icon } from "@/components/ui";
-import { colors } from "@/themes";
-import { LobbyView } from "@/components/lobby";
-import type { Player, ChatMessage } from "../types";
-
-interface WaitingPhaseProps {
-  /** List of players */
-  players: Player[];
-  /** Chat messages */
-  messages: ChatMessage[];
-  /** Current user ID */
-  currentUserId: string;
-  /** Callback when sending a chat message */
-  onSendMessage: (message: string) => void;
-  /** Callback for player actions */
-  onPlayerAction: (action: string, playerId: string) => void;
-}
+import { colors, withOpacity } from "@/themes";
 
 /**
- * Waiting phase component - shown when waiting for host to start
+ * Animated loading screen — no lobby, no chat, just a quick transition state
  */
-export function WaitingPhase({
-  players,
-  messages,
-  currentUserId,
-  onSendMessage,
-  onPlayerAction,
-}: WaitingPhaseProps) {
+export function WaitingPhase() {
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const dotAnims = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
+
+  useEffect(() => {
+    // Pulsing glow on the icon
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    // Staggered bouncing dots
+    dotAnims.forEach((anim, i) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 200),
+          Animated.timing(anim, {
+            toValue: -8,
+            duration: 300,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 300,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    });
+  }, []);
+
   return (
-    <View className="items-center py-8">
-      <Icon name="ellipsis-horizontal" size="xl" color={colors.neutral[400]} />
-      <Text variant="h3" className="font-bold mt-4">
-        Waiting for host...
+    <View className="items-center justify-center py-20">
+      {/* Pulsing icon */}
+      <Animated.View
+        style={{
+          opacity: pulseAnim,
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: withOpacity(colors.primary[500], 0.1),
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 24,
+        }}
+      >
+        <Icon name="game-controller" size="xl" color={colors.primary[500]} />
+      </Animated.View>
+
+      <Text variant="h3" className="font-bold">
+        Get Ready!
       </Text>
       <Text variant="body" color="secondary" className="mt-2">
-        The game will start soon
+        Loading first question...
       </Text>
 
-      <View className="w-full mt-6">
-        <LobbyView
-          players={players}
-          messages={messages}
-          onSendMessage={onSendMessage}
-          currentUserId={currentUserId}
-          showChat={true}
-          onPlayerAction={onPlayerAction}
-        />
+      {/* Bouncing dots */}
+      <View className="flex-row items-center mt-6 gap-2">
+        {dotAnims.map((anim, i) => (
+          <Animated.View
+            key={i}
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: colors.primary[500],
+              transform: [{ translateY: anim }],
+            }}
+          />
+        ))}
       </View>
     </View>
   );

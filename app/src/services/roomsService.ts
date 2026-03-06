@@ -43,9 +43,11 @@ export interface Room {
   selectedPack: {
     id: string;
     title: string;
+    description?: string | null;
     category: string | null;
     difficulty: string | null;
     imageUrl: string | null;
+    _count?: { questions: number };
   } | null;
   members?: RoomMember[];
 }

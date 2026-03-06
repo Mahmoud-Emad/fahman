@@ -1,10 +1,10 @@
 /**
- * ChatBubble - Chat message bubble component
+ * ChatBubble - Memoized chat message bubble for lobby chat
  */
-import React from "react";
+import React, { memo } from "react";
 import { View } from "react-native";
 import { Text, Avatar } from "@/components/ui";
-import { colors } from "@/themes";
+import { colors, withOpacity } from "@/themes";
 import type { ChatMessage } from "./types";
 
 interface ChatBubbleProps {
@@ -13,10 +13,9 @@ interface ChatBubbleProps {
 }
 
 /**
- * Chat message bubble
+ * Chat message bubble — memoized to avoid re-renders in FlatList
  */
-export function ChatBubble({ message, isOwn }: ChatBubbleProps) {
-  // System messages - styled based on variant
+export const ChatBubble = memo(function ChatBubble({ message, isOwn }: ChatBubbleProps) {
   if (message.type === "system") {
     const variantColors = {
       info: colors.neutral[400],
@@ -27,7 +26,7 @@ export function ChatBubble({ message, isOwn }: ChatBubbleProps) {
     const textColor = variantColors[message.systemVariant || "info"];
 
     return (
-      <View className="items-center my-3 px-4">
+      <View className="items-center my-2 px-4">
         <Text
           variant="caption"
           className="text-center"
@@ -40,11 +39,20 @@ export function ChatBubble({ message, isOwn }: ChatBubbleProps) {
   }
 
   return (
-    <View className={`flex-row mb-2 ${isOwn ? "justify-end" : "justify-start"}`}>
-      {!isOwn && <Avatar source={message.senderAvatar} initials={message.senderInitials} size="xs" />}
+    <View className={`flex-row mb-2.5 ${isOwn ? "justify-end" : "justify-start"}`}>
+      {!isOwn && (
+        <Avatar
+          uri={message.senderAvatar}
+          initials={message.senderInitials}
+          size="xs"
+          style={{ marginTop: 4 }}
+        />
+      )}
       <View
-        className={`rounded-2xl px-3 py-2 max-w-[75%] ${isOwn ? "mr-1" : "ml-2"}`}
-        style={{ backgroundColor: isOwn ? colors.primary[500] : colors.neutral[100] }}
+        className={`rounded-2xl px-3.5 py-2.5 max-w-[75%] ${isOwn ? "mr-1" : "ml-2"}`}
+        style={{
+          backgroundColor: isOwn ? colors.primary[500] : colors.neutral[100],
+        }}
       >
         {!isOwn && (
           <Text
@@ -61,7 +69,29 @@ export function ChatBubble({ message, isOwn }: ChatBubbleProps) {
         >
           {message.message}
         </Text>
+        <Text
+          variant="caption"
+          className="mt-0.5"
+          style={{
+            color: isOwn
+              ? withOpacity(colors.white, 0.6)
+              : colors.text.muted,
+            fontSize: 10,
+            alignSelf: isOwn ? "flex-end" : "flex-start",
+          }}
+        >
+          {formatTime(message.timestamp)}
+        </Text>
       </View>
     </View>
   );
+});
+
+function formatTime(date: Date): string {
+  const d = date instanceof Date ? date : new Date(date);
+  const hours = d.getHours();
+  const mins = d.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const h = hours % 12 || 12;
+  return `${h}:${mins.toString().padStart(2, "0")} ${ampm}`;
 }

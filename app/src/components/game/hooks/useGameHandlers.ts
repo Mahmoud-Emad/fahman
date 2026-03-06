@@ -1,12 +1,15 @@
 /**
  * useGameHandlers - Game action handlers wired to socket emissions
  */
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { Player, ChatMessage, GamePhase, RoomSettings } from "../types";
 import type { RootStackParamList } from "../../../../App";
 import { socketService } from "@/services/socketService";
+import { roomsService } from "@/services/roomsService";
+import { friendsService } from "@/services/friendsService";
+import { useToast } from "@/contexts";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "RoomDetails">;
 
@@ -32,6 +35,7 @@ interface UseGameHandlersOptions {
   // Messaging callbacks (optional)
   onOpenNotifications?: () => void;
   onOpenChatsList?: () => void;
+  onOpenFriendsList?: () => void;
 }
 
 /**
@@ -39,6 +43,12 @@ interface UseGameHandlersOptions {
  */
 export function useGameHandlers(options: UseGameHandlersOptions) {
   const navigation = useNavigation<NavigationProp>();
+  const toast = useToast();
+  const [removeFriendConfirm, setRemoveFriendConfirm] = useState<{
+    visible: boolean;
+    playerId: string | null;
+  }>({ visible: false, playerId: null });
+
   const {
     roomId,
     selectedAnswer,
@@ -53,6 +63,7 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
     setMessages,
     onOpenNotifications,
     onOpenChatsList,
+    onOpenFriendsList,
   } = options;
 
   // Handle answer submission — emit to server
@@ -71,27 +82,63 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
     socketService.nextQuestion(roomId);
   }, [roomId]);
 
-  // Handle sending chat message
+  // Handle sending chat message — emit to socket + add locally
   const handleSendMessage = useCallback(
     (message: string) => {
+      if (!message.trim()) return;
+
+      // Emit to socket for real-time broadcast
+      socketService.sendChatMessage(roomId, message.trim());
+
+      // Add to local state immediately for instant feedback
       const newMessage: ChatMessage = {
         id: String(Date.now()),
         senderId: currentUserId,
         senderName: "You",
         senderInitials: "YO",
-        message,
+        message: message.trim(),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, newMessage]);
     },
-    [currentUserId, setMessages]
+    [roomId, currentUserId, setMessages]
   );
 
   // Handle player actions (from menu)
   const handlePlayerAction = useCallback(
-    (action: string, playerId: string) => {
+    async (action: string, playerId: string) => {
       if (action === "view_profile") {
         navigation.navigate("UserProfile", { userId: playerId });
+        return;
+      }
+
+      if (action === "add_friend") {
+        // Read current friend status from player state
+        let isFriend = false;
+        setPlayers((prev) => {
+          isFriend = !!prev.find((p) => p.id === playerId)?.isFriend;
+          return prev;
+        });
+
+        if (isFriend) {
+          setRemoveFriendConfirm({ visible: true, playerId });
+          return;
+        }
+
+        // Send friend request
+        try {
+          const response = await friendsService.sendFriendRequest(playerId);
+          if (response.success) {
+            toast.success("Friend request sent!");
+            setPlayers((prev) =>
+              prev.map((p) => (p.id === playerId ? { ...p, friendRequestSent: true } : p))
+            );
+          } else {
+            toast.error(response.message || "Failed to send request");
+          }
+        } catch (error: any) {
+          toast.error(error.message || "Failed to send friend request");
+        }
         return;
       }
 
@@ -99,11 +146,6 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
         prev.map((p) => {
           if (p.id !== playerId) return p;
           switch (action) {
-            case "add_friend":
-              if (p.isFriend) {
-                return { ...p, isFriend: false };
-              }
-              return { ...p, friendRequestSent: true };
             case "mute":
               return { ...p, isMuted: !p.isMuted };
             case "block":
@@ -114,20 +156,53 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
         })
       );
     },
-    [setPlayers, navigation]
+    [setPlayers, navigation, toast]
   );
 
-  // Handle leave room
-  const handleLeaveRoom = useCallback(() => {
+  // Confirm remove friend — called from dialog
+  const confirmRemoveFriend = useCallback(async () => {
+    if (!removeFriendConfirm.playerId) return;
+    const playerId = removeFriendConfirm.playerId;
+    try {
+      const response = await friendsService.removeFriend(playerId);
+      if (response.success) {
+        toast.success("Friend removed");
+        setPlayers((prev) =>
+          prev.map((p) => (p.id === playerId ? { ...p, isFriend: false } : p))
+        );
+      } else {
+        toast.error(response.message || "Failed to remove friend");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to remove friend");
+    } finally {
+      setRemoveFriendConfirm({ visible: false, playerId: null });
+    }
+  }, [removeFriendConfirm.playerId, setPlayers, toast]);
+
+  // Cancel remove friend — dismiss dialog
+  const cancelRemoveFriend = useCallback(() => {
+    setRemoveFriendConfirm({ visible: false, playerId: null });
+  }, []);
+
+  // Handle leave room — call REST API then navigate home
+  const handleLeaveRoom = useCallback(async () => {
     setShowLeaveDialog(false);
-    navigation.goBack();
-  }, [navigation, setShowLeaveDialog]);
+    try {
+      await roomsService.leaveRoom(roomId);
+    } catch {
+      // Leave silently — navigation proceeds regardless
+    }
+    navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+  }, [roomId, navigation, setShowLeaveDialog]);
 
   // Handle bottom nav tab press
   const handleBottomTabPress = useCallback(
     (tabId: string) => {
-      if (tabId === "leave") {
-        setShowLeaveDialog(true);
+      if (tabId === "rooms") {
+        navigation.navigate("Rooms");
+      } else if (tabId === "friends") {
+        onOpenFriendsList?.();
       } else if (tabId === "chats") {
         onOpenChatsList?.();
       } else if (tabId === "notifications") {
@@ -136,7 +211,7 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
         navigation.navigate("Profile");
       }
     },
-    [setShowLeaveDialog, onOpenChatsList, onOpenNotifications, navigation]
+    [onOpenFriendsList, onOpenChatsList, onOpenNotifications, navigation]
   );
 
   return {
@@ -146,5 +221,8 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
     handlePlayerAction,
     handleLeaveRoom,
     handleBottomTabPress,
+    removeFriendConfirm,
+    confirmRemoveFriend,
+    cancelRemoveFriend,
   };
 }

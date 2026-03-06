@@ -62,7 +62,6 @@ export function ChatsListModal({
       visible={visible}
       onClose={onClose}
       title="Chats"
-      maxHeight="85%"
       padding="p-0"
     >
       {/* Search Input */}
@@ -74,8 +73,8 @@ export function ChatsListModal({
         />
       </View>
 
-      {/* Conversations List - fixed height ensures consistent modal size */}
-      <View style={{ height: 400 }}>
+      {/* Conversations List */}
+      <View style={{ flex: 1 }}>
         {/* Loading skeleton with fade out */}
         <Animated.View
           style={{

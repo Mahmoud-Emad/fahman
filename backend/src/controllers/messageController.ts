@@ -116,6 +116,8 @@ export async function sendRoomInvite(
         text: message.text,
         timestamp: message.createdAt,
         type: 'ROOM_INVITE',
+        roomCode,
+        roomTitle,
       });
     }
 

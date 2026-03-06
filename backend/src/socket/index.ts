@@ -5,7 +5,6 @@
 
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
-import { prisma } from '../config/database';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
@@ -87,32 +86,15 @@ export function initializeSocket(httpServer: HttpServer): Server {
     socket.on('disconnect', async (reason) => {
       logger.info(`Socket disconnected: ${authSocket.username} (${reason})`);
 
-      // Update presence in all rooms user was in
+      // Notify all rooms the user was in that they left
       const roomIds = Array.from(authSocket.roomIds || new Set());
       if (roomIds.length > 0) {
-        try {
-          // Update last seen in database for all rooms
-          await prisma.roomMember.updateMany({
-            where: {
-              userId: authSocket.userId,
-              roomId: { in: roomIds },
-              isActive: true,
-            },
-            data: {
-              lastSeenAt: new Date(),
-            },
+        roomIds.forEach((roomId) => {
+          io.to(roomId).emit('room:playerLeft', {
+            roomId,
+            playerId: authSocket.userId,
           });
-
-          // Notify each room that player left
-          roomIds.forEach((roomId) => {
-            io.to(roomId).emit('room:playerLeft', {
-              roomId,
-              playerId: authSocket.userId,
-            });
-          });
-        } catch (error: any) {
-          logger.error(`Error updating room presence on disconnect: ${error.message}`);
-        }
+        });
       }
 
       // Clean up
@@ -173,12 +155,47 @@ export function sendNotificationToUser(userId: string, notification: any): void 
 }
 
 /**
+ * Send notification update to a specific user via WebSocket
+ */
+export function sendNotificationUpdate(userId: string, data: { id: string; actionTaken: string }): void {
+  if (!ioInstance) {
+    logger.warn('Socket.io not initialized, cannot send notification update');
+    return;
+  }
+
+  ioInstance.sockets.sockets.forEach((socket) => {
+    const authSocket = socket as AuthenticatedSocket;
+    if (authSocket.userId === userId) {
+      authSocket.emit('notification:updated', data);
+    }
+  });
+}
+
+/**
  * Broadcast room closed event
  */
 export function emitRoomClosed(roomId: string, reason: string): void {
   if (!ioInstance) return;
   broadcastRoomClosed(ioInstance, roomId, reason);
   cleanupGameRoom(roomId);
+}
+
+/**
+ * Broadcast room list update to ALL connected sockets
+ * Used to keep room list screens in sync when players join/leave/room closes
+ */
+export function emitRoomListUpdate(roomId: string, currentPlayers: number, status: string): void {
+  if (!ioInstance) return;
+  ioInstance.emit('room:listUpdate', { roomId, currentPlayers, status });
+}
+
+/**
+ * Emit player left event (non-host leave)
+ */
+export function emitPlayerLeft(roomId: string, userId: string): void {
+  if (!ioInstance) return;
+  ioInstance.to(roomId).emit('room:playerLeft', { roomId, playerId: userId });
+  logger.info(`Emitted player left event for ${userId} in room ${roomId}`);
 }
 
 /**

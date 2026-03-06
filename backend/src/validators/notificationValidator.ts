@@ -4,6 +4,15 @@
 
 import Joi from 'joi';
 
+export const resolveActionSchema = Joi.object({
+  action: Joi.string()
+    .valid('accepted', 'declined', 'joined')
+    .required()
+    .messages({
+      'any.only': 'Action must be one of: accepted, declined, joined',
+    }),
+});
+
 export const sendRoomInvitesSchema = Joi.object({
   recipientIds: Joi.array()
     .items(Joi.string().uuid())

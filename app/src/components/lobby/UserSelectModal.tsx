@@ -221,7 +221,6 @@ export function UserSelectModal({
       visible={visible}
       onClose={handleClose}
       title="Invite Players"
-      maxHeight="80%"
     >
       <View className="flex-1">
         {/* Room Info */}
@@ -267,8 +266,8 @@ export function UserSelectModal({
           </View>
         )}
 
-        {/* User List - fixed height ensures consistent modal size */}
-        <View style={{ height: 300 }}>
+        {/* User List */}
+        <View style={{ flex: 1 }}>
           {/* Loading skeleton with fade out */}
           <Animated.View
             style={{

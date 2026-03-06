@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Button } from "@/components/ui";
 import { colors } from "@/themes";
+import { MODAL_SIZES } from "@/constants";
 import { PackSection } from "./PackSection";
 import type { PackData, PackSectionData } from "./types";
 
@@ -158,7 +159,7 @@ export function PackSelectionModal({
           className="bg-surface shadow-xl"
           pointerEvents="auto"
           style={{
-            maxHeight: SCREEN_HEIGHT * 0.85,
+            maxHeight: SCREEN_HEIGHT * MODAL_SIZES.DEFAULT_HEIGHT,
             borderTopLeftRadius: 24,
             borderTopRightRadius: 24,
             transform: [{ translateY: slideAnim }],

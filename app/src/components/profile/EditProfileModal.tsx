@@ -68,7 +68,7 @@ export function EditProfileModal({ visible, onClose, user, onSave }: EditProfile
   };
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Edit Profile" maxHeight="70%">
+    <Modal visible={visible} onClose={onClose} title="Edit Profile">
       <View className="items-center mb-6">
         <View className="relative">
           <Avatar

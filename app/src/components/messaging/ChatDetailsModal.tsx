@@ -24,6 +24,7 @@ import { MessageInput } from "./MessageInput";
 import type { Conversation, DirectMessage, RoomInviteData } from "./types";
 import { messageService } from "@/services/messageService";
 import { useToast } from "@/contexts";
+import { MODAL_SIZES } from "@/constants";
 import type { RootStackParamList } from "../../../App";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -210,8 +211,8 @@ export function ChatDetailsModal({
               backgroundColor: colors.white,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
-              maxHeight: SCREEN_HEIGHT * 0.9,
-              minHeight: SCREEN_HEIGHT * 0.5,
+              maxHeight: SCREEN_HEIGHT * MODAL_SIZES.DEFAULT_HEIGHT,
+              minHeight: SCREEN_HEIGHT * MODAL_SIZES.KEYBOARD_HEIGHT,
               transform: [{ translateY: slideAnim }],
               shadowColor: "#000",
               shadowOffset: { width: 0, height: -2 },

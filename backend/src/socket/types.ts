@@ -57,6 +57,7 @@ export interface ServerToClientEvents {
   'room:updated': (data: { roomId: string; updates: Partial<RoomInfo> }) => void;
   'room:closed': (data: { roomId: string; reason: string }) => void;
   'room:kicked': (data: { roomId: string; reason: string }) => void;
+  'room:listUpdate': (data: { roomId: string; currentPlayers: number; status: string }) => void;
 
   // Game events
   'game:started': (data: GameStartedData) => void;
@@ -79,6 +80,7 @@ export interface ServerToClientEvents {
 
   // Notification events
   'notification:new': (data: NotificationData) => void;
+  'notification:updated': (data: NotificationUpdateData) => void;
 
   // Direct message events
   'dm:message': (data: DirectMessage) => void;
@@ -203,6 +205,11 @@ export interface NotificationData {
     displayName: string | null;
     avatar: string | null;
   } | null;
+}
+
+export interface NotificationUpdateData {
+  id: string;
+  actionTaken: string;
 }
 
 // Inter-server events (for scaling with Redis adapter)

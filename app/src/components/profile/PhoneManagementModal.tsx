@@ -146,7 +146,7 @@ export function PhoneManagementModal({
   const title = step === "input" ? (phoneNumber ? "Update Phone" : "Add Phone") : "Verify Phone";
 
   return (
-    <Modal visible={visible} onClose={onClose} title={title} maxHeight="60%">
+    <Modal visible={visible} onClose={onClose} title={title}>
       {step === "input" ? (
         <>
           {/* Current phone display */}

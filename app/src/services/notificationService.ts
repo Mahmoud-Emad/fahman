@@ -95,6 +95,13 @@ export const notificationService = {
   },
 
   /**
+   * Resolve a notification action (accept, decline, join)
+   */
+  async resolveAction(notificationId: string, action: string): Promise<ApiResponse<null>> {
+    return api.patch(`/notifications/${notificationId}/action`, { action });
+  },
+
+  /**
    * Send room invites
    */
   async sendRoomInvites(data: {

@@ -6,6 +6,7 @@
 import { Response, NextFunction } from 'express';
 import notificationService from '../services/notificationService';
 import { successResponse } from '../utils/responseFormatter';
+import { sendNotificationToUser } from '../socket';
 import { AuthRequest } from '../types';
 
 /**
@@ -103,6 +104,20 @@ export async function deleteReadNotifications(req: AuthRequest, res: Response, n
 }
 
 /**
+ * Resolve an action on a notification (accept, decline, joined, etc.)
+ */
+export async function resolveAction(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { action } = req.body;
+    const notification = await notificationService.resolveAction(req.user.id, req.params.id, action);
+    sendNotificationToUser(req.user.id, notification);
+    res.json(successResponse(notification, 'Notification action resolved'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * Send room invite notifications to multiple users
  */
 export async function sendRoomInvites(req: AuthRequest, res: Response, next: NextFunction) {
@@ -110,15 +125,17 @@ export async function sendRoomInvites(req: AuthRequest, res: Response, next: Nex
     const { recipientIds, roomCode, roomTitle, packTitle } = req.body;
 
     const notifications = await Promise.all(
-      recipientIds.map((recipientId: string) =>
-        notificationService.createRoomInviteNotification(
+      recipientIds.map(async (recipientId: string) => {
+        const notification = await notificationService.createRoomInviteNotification(
           recipientId,
           req.user.id,
           roomCode,
           roomTitle,
           packTitle
-        )
-      )
+        );
+        sendNotificationToUser(recipientId, notification);
+        return notification;
+      })
     );
 
     res.status(201).json(successResponse({ sent: notifications.length }, 'Invitations sent'));

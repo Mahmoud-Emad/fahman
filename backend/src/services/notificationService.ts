@@ -51,6 +51,7 @@ export class NotificationService {
       senderId: notification.senderId,
       actionData: notification.actionData,
       isRead: notification.isRead,
+      actionTaken: notification.actionTaken,
       createdAt: notification.createdAt,
       sender: (notification as any).sender ? {
         id: (notification as any).sender.id,
@@ -177,6 +178,83 @@ export class NotificationService {
     return { deleted: result.count };
   }
 
+  /**
+   * Resolve an action on a notification (e.g., accept/decline friend request, join room)
+   */
+  async resolveAction(userId: string, notificationId: string, action: string) {
+    const notification = await prisma.notification.findUnique({
+      where: { id: notificationId },
+    });
+
+    if (!notification) {
+      throw new NotFoundError('Notification not found');
+    }
+
+    if (notification.userId !== userId) {
+      throw new ForbiddenError('Cannot access this notification');
+    }
+
+    if (notification.actionTaken) {
+      return notification;
+    }
+
+    const updated = await prisma.notification.update({
+      where: { id: notificationId },
+      data: { actionTaken: action },
+      include: {
+        sender: {
+          select: { id: true, username: true, displayName: true, avatar: true },
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      userId: updated.userId,
+      type: updated.type,
+      title: updated.title,
+      message: updated.message,
+      senderId: updated.senderId,
+      actionData: updated.actionData,
+      isRead: updated.isRead,
+      actionTaken: updated.actionTaken,
+      createdAt: updated.createdAt,
+      sender: (updated as any).sender ? {
+        id: (updated as any).sender.id,
+        username: (updated as any).sender.username,
+        displayName: (updated as any).sender.displayName,
+        avatar: (updated as any).sender.avatar,
+      } : null,
+    };
+  }
+
+  /**
+   * Resolve a notification by sender and type (used internally when the action happens externally)
+   */
+  async resolveByContext(userId: string, senderId: string, type: NotificationType, action: string) {
+    const notification = await prisma.notification.findFirst({
+      where: {
+        userId,
+        senderId,
+        type,
+        actionTaken: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!notification) {
+      logger.info(`No pending ${type} notification found for user ${userId} from ${senderId}`);
+      return null;
+    }
+
+    const updated = await prisma.notification.update({
+      where: { id: notification.id },
+      data: { actionTaken: action },
+    });
+
+    return { id: updated.id, actionTaken: updated.actionTaken };
+  }
+
   // ==========================================
   // Helper methods for creating specific types
   // ==========================================
@@ -205,9 +283,11 @@ export class NotificationService {
       message: `${senderName} invited you to join "${roomTitle}"`,
       senderId,
       actionData: {
+        type: 'room_invite',
         roomCode,
         roomTitle,
         packTitle,
+        senderName,
       },
     });
   }
@@ -242,6 +322,7 @@ export class NotificationService {
         senderId: existing.senderId,
         actionData: existing.actionData,
         isRead: existing.isRead,
+        actionTaken: existing.actionTaken,
         createdAt: existing.createdAt,
         sender: (existing as any).sender ? {
           id: (existing as any).sender.id,

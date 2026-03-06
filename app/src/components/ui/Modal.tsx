@@ -18,6 +18,7 @@ import { cn } from "@/utils/cn";
 import { Text } from "./Text";
 import { Button } from "./Button";
 import { colors } from "@/themes";
+import { MODAL_SIZES } from "@/constants";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -81,7 +82,7 @@ export function Modal({
   className,
   width,
   height,
-  maxHeight = "90%",
+  maxHeight = `${MODAL_SIZES.DEFAULT_HEIGHT * 100}%`,
   bgColor = "bg-surface",
   borderRadius,
   border,
@@ -101,7 +102,7 @@ export function Modal({
       ? (parseFloat(maxHeight) / 100) * SCREEN_HEIGHT
       : typeof maxHeight === "number"
         ? maxHeight
-        : SCREEN_HEIGHT * 0.9;
+        : SCREEN_HEIGHT * MODAL_SIZES.DEFAULT_HEIGHT;
 
   useEffect(() => {
     if (visible) {

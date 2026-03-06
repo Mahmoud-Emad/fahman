@@ -17,7 +17,7 @@ import {
 import * as NavigationBar from "expo-navigation-bar";
 import * as Linking from "expo-linking";
 import { ThemeProvider } from "./src/themes";
-import { AuthProvider, useAuth, ToastProvider, useToast } from "./src/contexts";
+import { AuthProvider, useAuth, ToastProvider, useToast, MessagingProvider } from "./src/contexts";
 import { HomeScreen, WelcomeScreen, SettingsScreen, LoginScreen, CredentialLoginScreen, ForgotPasswordScreen, RoomsScreen, RoomDetailsScreen, RoomConfigScreen, RoomLobbyScreen, PackCreationScreen, JoinRoomScreen, ProfileScreen, UserProfileScreen, BlockedUsersScreen, GameResultsScreen } from "./src/screens";
 import { AvatarSelectionModal } from "./src/components/profile/AvatarSelectionModal";
 import { colors } from "./src/themes";
@@ -204,9 +204,9 @@ function MainStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="Rooms" component={RoomsScreen} />
-      <Stack.Screen name="RoomDetails" component={RoomDetailsScreen} />
+      <Stack.Screen name="RoomDetails" component={RoomDetailsScreen} options={{ gestureEnabled: false }} />
       <Stack.Screen name="RoomConfig" component={RoomConfigScreen} />
-      <Stack.Screen name="RoomLobby" component={RoomLobbyScreen} />
+      <Stack.Screen name="RoomLobby" component={RoomLobbyScreen} options={{ gestureEnabled: false }} />
       <Stack.Screen name="PackCreation" component={PackCreationScreen} />
       <Stack.Screen name="JoinRoom" component={JoinRoomScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
@@ -454,7 +454,13 @@ function AppContent() {
         <WelcomeScreen onComplete={handleWelcomeComplete} duration={3000} />
       ) : (
         <NavigationContainer ref={navigationRef}>
-          {isAuthenticated ? <MainStack /> : <AuthStack />}
+          {isAuthenticated ? (
+            <MessagingProvider navigationRef={navigationRef}>
+              <MainStack />
+            </MessagingProvider>
+          ) : (
+            <AuthStack />
+          )}
         </NavigationContainer>
       )}
       {/* Avatar selection modal for new users */}

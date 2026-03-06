@@ -97,7 +97,6 @@ export function DirectMessageBubble({
       >
         <RoomInviteCard
           invite={roomInvite}
-          isOwn={isOwn}
           onJoin={() => onJoinRoom?.(roomInvite)}
         />
         {showTimestamp && (

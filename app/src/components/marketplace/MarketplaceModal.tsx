@@ -9,6 +9,7 @@ import { Text, Icon, Button } from "@/components/ui";
 import { BuyCoinsModal } from "@/components/common";
 import { storeService, type StoreData, type AvatarAlbum, type StoreItem, type SoundItem } from "@/services/storeService";
 import { colors, withOpacity } from "@/themes";
+import { MODAL_SIZES } from "@/constants";
 import { useToast } from "@/contexts";
 import { AvatarsTab } from "./AvatarShopTab";
 import { SoundsTab, SoundPreviewModal } from "./SoundShopTab";
@@ -157,7 +158,7 @@ export function MarketplaceModal({
         </Animated.View>
 
         {/* Modal Content */}
-        <Animated.View className="bg-surface-secondary" pointerEvents="auto" style={{ height: SCREEN_HEIGHT * 0.88, borderTopLeftRadius: 24, borderTopRightRadius: 24, transform: [{ translateY: slideAnim }] }}>
+        <Animated.View className="bg-surface-secondary" pointerEvents="auto" style={{ height: SCREEN_HEIGHT * MODAL_SIZES.DEFAULT_HEIGHT, borderTopLeftRadius: 24, borderTopRightRadius: 24, transform: [{ translateY: slideAnim }] }}>
           {/* Header */}
           <View className="px-5 pt-4 pb-3">
             <View className="items-center mb-3">

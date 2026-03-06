@@ -21,3 +21,5 @@ export {
 } from "./usePacks";
 
 export { useRoomPresence } from "./useRoomPresence";
+
+export { useSound } from "./useSound";

@@ -4,7 +4,7 @@
  * Manages app lifecycle to handle backgrounding/closing gracefully
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { socketService } from '@/services/socketService';
 import type { RoomMemberInfo } from '@/services/socketService';
@@ -12,6 +12,7 @@ import type { RoomMemberInfo } from '@/services/socketService';
 interface UseRoomPresenceOptions {
   roomId: string;
   enabled?: boolean;
+  onRoomJoined?: (members: RoomMemberInfo[]) => void;
   onPlayerJoined?: (player: RoomMemberInfo) => void;
   onPlayerLeft?: (playerId: string) => void;
   onRoomClosed?: (reason: string) => void;
@@ -22,23 +23,16 @@ interface UseRoomPresenceOptions {
  * Hook to manage room presence via WebSocket
  *
  * Features:
- * - Auto join room on mount
+ * - Auto join room when socket is connected (no timing hacks)
  * - Auto leave room on unmount
  * - Handle app backgrounding (leave room)
  * - Handle app foregrounding (rejoin room)
  * - Clean event listener management
- *
- * @example
- * useRoomPresence({
- *   roomId: route.params.roomId,
- *   onPlayerJoined: (player) => console.log('Player joined:', player),
- *   onPlayerLeft: (playerId) => console.log('Player left:', playerId),
- *   onRoomClosed: (reason) => navigation.navigate('Home'),
- * });
  */
 export function useRoomPresence({
   roomId,
   enabled = true,
+  onRoomJoined,
   onPlayerJoined,
   onPlayerLeft,
   onRoomClosed,
@@ -46,48 +40,46 @@ export function useRoomPresence({
 }: UseRoomPresenceOptions) {
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const isJoinedRef = useRef(false);
-  const cleanupFnsRef = useRef<(() => void)[]>([]);
 
   /**
    * Join the room socket channel
    */
-  const joinRoom = () => {
-    if (!enabled || isJoinedRef.current) return;
+  const joinRoom = useCallback(() => {
+    if (!enabled || isJoinedRef.current || !roomId) return;
 
-    socketService.joinRoom(roomId);
-    isJoinedRef.current = true;
-  };
+    if (socketService.isConnected) {
+      socketService.joinRoom(roomId);
+      isJoinedRef.current = true;
+    }
+  }, [enabled, roomId]);
 
   /**
    * Leave the room socket channel
    */
-  const leaveRoom = () => {
+  const leaveRoom = useCallback(() => {
     if (!isJoinedRef.current) return;
 
     socketService.leaveRoom(roomId);
     isJoinedRef.current = false;
-  };
+  }, [roomId]);
 
   /**
-   * Setup event listeners
+   * Setup event listeners and join room
    */
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !roomId) return;
 
-    // Connect socket if not already connected
-    if (!socketService.isConnected) {
-      socketService.connect().catch((error) => {
-        console.error('Failed to connect socket:', error);
-      });
-    }
-
-    // Wait a bit for socket to connect before joining
-    const joinTimeout = setTimeout(() => {
-      joinRoom();
-    }, 100);
-
-    // Setup event listeners
     const unsubscribers: (() => void)[] = [];
+
+    // Room joined event (initial members list from server)
+    if (onRoomJoined) {
+      const unsub = socketService.onRoomJoined((data) => {
+        if (data.roomId === roomId) {
+          onRoomJoined(data.members);
+        }
+      });
+      unsubscribers.push(unsub);
+    }
 
     // Player joined event
     if (onPlayerJoined) {
@@ -129,15 +121,26 @@ export function useRoomPresence({
       unsubscribers.push(unsub);
     }
 
-    // Store cleanup functions
-    cleanupFnsRef.current = unsubscribers;
+    // Join immediately if socket is already connected
+    if (socketService.isConnected) {
+      socketService.joinRoom(roomId);
+      isJoinedRef.current = true;
+    }
+
+    // Also join when socket (re)connects — handles initial connection,
+    // reconnections, and cases where socket wasn't ready yet
+    const unsubConnect = socketService.onConnect(() => {
+      if (!isJoinedRef.current) {
+        socketService.joinRoom(roomId);
+        isJoinedRef.current = true;
+      }
+    });
+    unsubscribers.push(unsubConnect);
 
     // Cleanup on unmount
     return () => {
-      clearTimeout(joinTimeout);
       leaveRoom();
       unsubscribers.forEach((unsub) => unsub());
-      cleanupFnsRef.current = [];
     };
   }, [roomId, enabled]);
 
@@ -145,7 +148,7 @@ export function useRoomPresence({
    * Handle app state changes (background/foreground)
    */
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !roomId) return;
 
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       // App going to background
@@ -153,7 +156,6 @@ export function useRoomPresence({
         appState.current.match(/active/) &&
         nextAppState.match(/inactive|background/)
       ) {
-        console.log('[RoomPresence] App going to background, leaving room');
         leaveRoom();
       }
 
@@ -162,14 +164,9 @@ export function useRoomPresence({
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        console.log('[RoomPresence] App coming to foreground, rejoining room');
-        // Reconnect socket if needed
         if (!socketService.isConnected) {
-          socketService.connect().then(() => {
-            joinRoom();
-          }).catch((error) => {
-            console.error('Failed to reconnect socket:', error);
-          });
+          // Socket will reconnect automatically, onConnect listener will rejoin room
+          socketService.connect().catch(() => {});
         } else {
           joinRoom();
         }
@@ -181,12 +178,9 @@ export function useRoomPresence({
     return () => {
       subscription.remove();
     };
-  }, [roomId, enabled]);
+  }, [roomId, enabled, joinRoom, leaveRoom]);
 
   return {
-    /**
-     * Manually leave the room (useful for explicit leave actions)
-     */
     leave: leaveRoom,
   };
 }

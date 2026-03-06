@@ -229,7 +229,6 @@ export function CreateGameDialog({ visible, friend, onClose }: CreateGameDialogP
       visible={visible}
       onClose={onClose}
       title={`Play with ${friend.name}`}
-      maxHeight="80%"
     >
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Pack Selection */}

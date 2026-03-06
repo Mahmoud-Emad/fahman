@@ -72,7 +72,6 @@ export function ShareRoomModal({
       visible={visible}
       onClose={onClose}
       title="Share Room"
-      maxHeight="60%"
     >
       <View className="gap-4">
         {/* Room Code Display */}

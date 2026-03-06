@@ -10,14 +10,14 @@ import type { Player } from "./types";
 /**
  * Single player card in the lobby
  */
-function PlayerCard({ player, isHost }: { player: Player; isHost: boolean }) {
+function PlayerCard({ player, isCurrentUser, isHostPlayer }: { player: Player; isCurrentUser: boolean; isHostPlayer: boolean }) {
   return (
     <View
       className="flex-row items-center p-3 rounded-xl mb-2"
       style={{
-        backgroundColor: colors.white,
-        borderWidth: 1,
-        borderColor: colors.border,
+        backgroundColor: isCurrentUser ? withOpacity(colors.primary[500], 0.05) : colors.white,
+        borderWidth: isCurrentUser ? 1.5 : 1,
+        borderColor: isCurrentUser ? colors.primary[500] : colors.border,
       }}
     >
       <Avatar uri={player.avatar || undefined} initials={player.initials} size="sm" />
@@ -26,11 +26,18 @@ function PlayerCard({ player, isHost }: { player: Player; isHost: boolean }) {
           {player.name}
         </Text>
       </View>
-      {isHost && player.id === "host" && (
-        <Badge variant="primary" size="sm">
-          Host
-        </Badge>
-      )}
+      <View className="flex-row items-center gap-1.5">
+        {isHostPlayer && (
+          <Badge variant="warning" size="sm">
+            Host
+          </Badge>
+        )}
+        {isCurrentUser && (
+          <Badge variant="primary" size="sm">
+            You
+          </Badge>
+        )}
+      </View>
     </View>
   );
 }
@@ -41,6 +48,8 @@ interface LobbyPlayerListProps {
   isHost: boolean;
   canStart: boolean;
   minPlayersToStart: number;
+  currentUserId: string;
+  hostId: string;
   onInvite: () => void;
 }
 
@@ -53,8 +62,24 @@ export function LobbyPlayerList({
   isHost,
   canStart,
   minPlayersToStart,
+  currentUserId,
+  hostId,
   onInvite,
 }: LobbyPlayerListProps) {
+  // Sort: host first, current user second, others after
+  const sortedPlayers = [...players].sort((a, b) => {
+    const aIsHost = a.id === hostId;
+    const bIsHost = b.id === hostId;
+    const aIsYou = a.id === currentUserId;
+    const bIsYou = b.id === currentUserId;
+
+    if (aIsHost) return -1;
+    if (bIsHost) return 1;
+    if (aIsYou) return -1;
+    if (bIsYou) return 1;
+    return 0;
+  });
+
   return (
     <View className="mb-4">
       <View className="flex-row items-center justify-between mb-3">
@@ -66,8 +91,13 @@ export function LobbyPlayerList({
         </Badge>
       </View>
 
-      {players.map((player) => (
-        <PlayerCard key={player.id} player={player} isHost={isHost} />
+      {sortedPlayers.map((player) => (
+        <PlayerCard
+          key={player.id}
+          player={player}
+          isCurrentUser={player.id === currentUserId}
+          isHostPlayer={player.id === hostId}
+        />
       ))}
 
       <Pressable

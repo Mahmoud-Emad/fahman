@@ -41,7 +41,7 @@ export function RoomDetailsDialog({
   const questionStatus = getQuestionLabel(room);
 
   return (
-    <Modal visible={visible} onClose={onClose} title="" maxHeight="85%">
+    <Modal visible={visible} onClose={onClose} title="">
       <View>
         {/* Header Section */}
         <View className="flex-row items-start mb-4">

@@ -10,23 +10,37 @@ import type { RoomInviteData } from "./types";
 interface RoomInviteCardProps {
   invite: RoomInviteData;
   onJoin: () => void;
-  isOwn: boolean;
+}
+
+function getDisabledText(expiredReason?: RoomInviteData["expiredReason"]): string {
+  switch (expiredReason) {
+    case "deleted":
+      return "Room no longer exists";
+    case "full":
+      return "Room is full";
+    case "in_progress":
+      return "Game already started";
+    case "finished":
+      return "Game has ended";
+    case "closed":
+      return "Room has been closed";
+    default:
+      return "Room no longer available";
+  }
 }
 
 /**
  * RoomInviteCard component
  */
-export function RoomInviteCard({ invite, onJoin, isOwn }: RoomInviteCardProps) {
-  const { packName, roomCode, isActive, currentPlayers, maxPlayers } = invite;
+export function RoomInviteCard({ invite, onJoin }: RoomInviteCardProps) {
+  const { packName, roomCode, isActive, currentPlayers, maxPlayers, expiredReason } = invite;
 
   return (
     <View
       className="rounded-xl overflow-hidden"
       style={{
-        backgroundColor: isOwn
-          ? withOpacity(colors.white, 0.2)
-          : colors.white,
-        borderWidth: isOwn ? 0 : 1,
+        backgroundColor: colors.white,
+        borderWidth: 1,
         borderColor: colors.border,
         maxWidth: 260,
       }}
@@ -35,20 +49,18 @@ export function RoomInviteCard({ invite, onJoin, isOwn }: RoomInviteCardProps) {
       <View
         className="flex-row items-center px-3 py-2"
         style={{
-          backgroundColor: isOwn
-            ? withOpacity(colors.white, 0.1)
-            : withOpacity(colors.primary[500], 0.1),
+          backgroundColor: withOpacity(colors.primary[500], 0.1),
         }}
       >
         <Icon
           name="game-controller"
           size="sm"
-          color={isOwn ? colors.white : colors.primary[500]}
+          color={colors.primary[500]}
         />
         <Text
           variant="caption"
           className="ml-2 font-semibold"
-          style={{ color: isOwn ? colors.white : colors.primary[500] }}
+          style={{ color: colors.primary[500] }}
         >
           Room Invite
         </Text>
@@ -60,7 +72,7 @@ export function RoomInviteCard({ invite, onJoin, isOwn }: RoomInviteCardProps) {
           variant="body"
           className="font-semibold mb-1"
           numberOfLines={1}
-          style={{ color: isOwn ? colors.white : colors.text.primary }}
+          style={{ color: colors.text.primary }}
         >
           {packName}
         </Text>
@@ -69,48 +81,49 @@ export function RoomInviteCard({ invite, onJoin, isOwn }: RoomInviteCardProps) {
           <View className="flex-row items-center">
             <Text
               variant="caption"
-              style={{ color: isOwn ? withOpacity(colors.white, 0.8) : colors.text.muted }}
+              style={{ color: colors.text.muted }}
             >
               Code:{" "}
             </Text>
             <Text
               variant="caption"
               className="font-bold tracking-wider"
-              style={{ color: isOwn ? colors.white : colors.primary[500] }}
+              style={{ color: colors.primary[500] }}
             >
               {roomCode}
             </Text>
           </View>
 
-          <View className="flex-row items-center">
-            <Icon
-              name="people"
-              customSize={12}
-              color={isOwn ? withOpacity(colors.white, 0.8) : colors.neutral[500]}
-            />
-            <Text
-              variant="caption"
-              className="ml-1"
-              style={{ color: isOwn ? withOpacity(colors.white, 0.8) : colors.text.muted }}
-            >
-              {currentPlayers}/{maxPlayers}
-            </Text>
-          </View>
+          {expiredReason !== "deleted" && (
+            <View className="flex-row items-center">
+              <Icon
+                name="people"
+                customSize={12}
+                color={colors.neutral[500]}
+              />
+              <Text
+                variant="caption"
+                className="ml-1"
+                style={{ color: colors.text.muted }}
+              >
+                {currentPlayers}/{maxPlayers}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Join Button */}
         {isActive ? (
           <Button
-            variant={isOwn ? "outline" : "primary"}
+            variant="primary"
             size="sm"
             fullWidth
             onPress={onJoin}
-            style={isOwn ? { borderColor: colors.white } : undefined}
           >
             <Text
               variant="body-sm"
               className="font-semibold"
-              style={{ color: isOwn ? colors.white : colors.white }}
+              style={{ color: colors.white }}
             >
               Join Game
             </Text>
@@ -122,9 +135,9 @@ export function RoomInviteCard({ invite, onJoin, isOwn }: RoomInviteCardProps) {
           >
             <Text
               variant="caption"
-              style={{ color: isOwn ? withOpacity(colors.white, 0.6) : colors.neutral[500] }}
+              style={{ color: colors.neutral[500] }}
             >
-              Room no longer available
+              {getDisabledText(expiredReason)}
             </Text>
           </View>
         )}

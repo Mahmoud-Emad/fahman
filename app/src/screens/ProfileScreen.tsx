@@ -7,8 +7,8 @@ import { View, Pressable, Share, Animated, StyleSheet } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { Text, Icon, Avatar, Dialog } from "@/components/ui";
-import { BottomNavBar, PROFILE_TABS } from "@/components/navigation";
+import { Text, Icon, Avatar, Dialog, Skeleton } from "@/components/ui";
+import { BottomNavBar } from "@/components/navigation";
 import { NotificationsModal, ChatsListModal, ChatDetailsModal } from "@/components/messaging";
 import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
 import {
@@ -49,6 +49,162 @@ function getInitials(name: string | null | undefined): string {
 }
 
 const EMPTY_STATS = { gamesPlayed: 0, wins: 0, winRate: 0, friends: 0, currentStreak: 0, bestStreak: 0 };
+
+/**
+ * Skeleton placeholder for the profile scrollable content
+ */
+function ProfileContentSkeleton() {
+  return (
+    <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+      {/* Account Info Card Skeleton */}
+      <View style={skeletonStyles.card}>
+        {/* Game ID row */}
+        <View style={skeletonStyles.row}>
+          <Skeleton.Circle size={40} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Skeleton.Box width={80} height={12} />
+            <Skeleton.Box width={120} height={16} style={{ marginTop: 6 }} />
+          </View>
+          <Skeleton.Box width={32} height={32} borderRadius={16} />
+        </View>
+        <View style={skeletonStyles.divider} />
+        {/* Email row */}
+        <View style={skeletonStyles.row}>
+          <Skeleton.Circle size={40} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Skeleton.Box width={60} height={12} />
+            <Skeleton.Box width={160} height={16} style={{ marginTop: 6 }} />
+          </View>
+        </View>
+        <View style={skeletonStyles.divider} />
+        {/* Phone row */}
+        <View style={skeletonStyles.row}>
+          <Skeleton.Circle size={40} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Skeleton.Box width={70} height={12} />
+            <Skeleton.Box width={140} height={16} style={{ marginTop: 6 }} />
+          </View>
+        </View>
+      </View>
+
+      {/* Stats Grid Skeleton */}
+      <View style={skeletonStyles.card}>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={skeletonStyles.statCell}>
+              <Skeleton.Circle size={28} />
+              <Skeleton.Box width={40} height={10} style={{ marginTop: 8 }} />
+              <Skeleton.Box width={24} height={18} style={{ marginTop: 4 }} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Streak Card Skeleton */}
+      <View style={skeletonStyles.card}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Skeleton.Box width={48} height={48} borderRadius={14} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Skeleton.Box width={120} height={16} />
+            <Skeleton.Box width={80} height={12} style={{ marginTop: 6 }} />
+          </View>
+          <Skeleton.Box width={32} height={32} borderRadius={8} />
+        </View>
+      </View>
+
+      {/* Achievements Section Skeleton */}
+      <View style={{ marginTop: 24 }}>
+        <View style={skeletonStyles.sectionHeader}>
+          <Skeleton.Box width={120} height={18} />
+          <Skeleton.Box width={60} height={14} />
+        </View>
+        <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={{ alignItems: "center" }}>
+              <Skeleton.Circle size={52} />
+              <Skeleton.Box width={48} height={10} style={{ marginTop: 6 }} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Packs Section Skeleton */}
+      <View style={{ marginTop: 24 }}>
+        <View style={skeletonStyles.sectionHeader}>
+          <Skeleton.Box width={100} height={18} />
+          <Skeleton.Box width={70} height={14} />
+        </View>
+        {[1, 2].map((i) => (
+          <View key={i} style={[skeletonStyles.card, { marginTop: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Skeleton.Box width={56} height={56} borderRadius={12} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Skeleton.Box width={140} height={16} />
+                <Skeleton.Box width={100} height={12} style={{ marginTop: 6 }} />
+              </View>
+              <Skeleton.Box width={28} height={28} borderRadius={14} />
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Games Section Skeleton */}
+      <View style={{ marginTop: 24 }}>
+        <View style={skeletonStyles.sectionHeader}>
+          <Skeleton.Box width={120} height={18} />
+          <Skeleton.Box width={60} height={14} />
+        </View>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={[skeletonStyles.card, { marginTop: 8 }]}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Skeleton.Box width={44} height={44} borderRadius={10} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Skeleton.Box width={130} height={14} />
+                <Skeleton.Box width={80} height={12} style={{ marginTop: 6 }} />
+              </View>
+              <Skeleton.Box width={48} height={20} borderRadius={10} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const skeletonStyles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 16,
+    marginTop: 16,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.neutral[100],
+    marginVertical: 4,
+  },
+  statCell: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+});
 
 /**
  * ProfileScreen component
@@ -229,6 +385,8 @@ export function ProfileScreen() {
     recentGames: recentGames.map(g => ({ id: g.id, packName: g.packTitle, result: g.result, score: g.score, date: new Date(g.playedAt).toLocaleDateString() })),
   }), [authUser, userStats, achievements, recentGames, friendsHook.friends]);
 
+  const isInitialLoading = statsLoading && packsLoading && roomsLoading;
+
   const expandedOpacity = scrollY.interpolate({ inputRange: [0, SCROLL_DISTANCE * 0.6], outputRange: [1, 0], extrapolate: "clamp" });
   const collapsedOpacity = scrollY.interpolate({ inputRange: [SCROLL_DISTANCE * 0.4, SCROLL_DISTANCE], outputRange: [0, 1], extrapolate: "clamp" });
   const expandedTranslateY = scrollY.interpolate({ inputRange: [0, SCROLL_DISTANCE], outputRange: [0, -30], extrapolate: "clamp" });
@@ -272,9 +430,9 @@ export function ProfileScreen() {
 
   const handleTabPress = (tabId: string) => {
     if (tabId === "home") navigation.navigate("Home" as never);
+    else if (tabId === "friends") friendsHook.openFriendsList();
     else if (tabId === "chats") messaging.openChatsList();
     else if (tabId === "notifications") messaging.openNotifications();
-    else if (tabId === "friends") friendsHook.openFriendsList();
   };
 
   const topBarHeight = insets.top + 56;
@@ -338,27 +496,33 @@ export function ProfileScreen() {
           listener: (event: any) => { scrollYJS.setValue(event.nativeEvent.contentOffset.y); },
         })}
       >
-        <ProfileStatsSection
-          gameId={displayData.gameId}
-          email={displayData.email}
-          phoneNumber={displayData.phoneNumber}
-          phoneVerified={displayData.phoneVerified}
-          stats={displayData.stats}
-          onPhoneManagement={() => setPhoneModalVisible(true)}
-          onCopyGameId={handleCopyGameId}
-        />
-        <ProfileAchievementsSection achievements={displayData.achievements} statsLoading={statsLoading} />
-        <ProfilePacksSection
-          userPacks={userPacks} packsLoading={packsLoading}
-          userRooms={userRooms} roomsLoading={roomsLoading}
-          onPackPress={handlePackPress} onPackEdit={handlePackEdit}
-          onPackDelete={handlePackDelete} onCreatePack={handleCreatePack}
-          onRoomPress={handleRoomPress} onRoomDelete={handleRoomDelete}
-        />
-        <ProfileGamesSection recentGames={displayData.recentGames} statsLoading={statsLoading} joinDate={displayData.joinDate} />
+        {isInitialLoading ? (
+          <ProfileContentSkeleton />
+        ) : (
+          <>
+            <ProfileStatsSection
+              gameId={displayData.gameId}
+              email={displayData.email}
+              phoneNumber={displayData.phoneNumber}
+              phoneVerified={displayData.phoneVerified}
+              stats={displayData.stats}
+              onPhoneManagement={() => setPhoneModalVisible(true)}
+              onCopyGameId={handleCopyGameId}
+            />
+            <ProfileAchievementsSection achievements={displayData.achievements} statsLoading={statsLoading} />
+            <ProfilePacksSection
+              userPacks={userPacks} packsLoading={packsLoading}
+              userRooms={userRooms} roomsLoading={roomsLoading}
+              onPackPress={handlePackPress} onPackEdit={handlePackEdit}
+              onPackDelete={handlePackDelete} onCreatePack={handleCreatePack}
+              onRoomPress={handleRoomPress} onRoomDelete={handleRoomDelete}
+            />
+            <ProfileGamesSection recentGames={displayData.recentGames} statsLoading={statsLoading} joinDate={displayData.joinDate} />
+          </>
+        )}
       </Animated.ScrollView>
 
-      <BottomNavBar tabs={PROFILE_TABS} activeTab="profile" onTabPress={handleTabPress} badges={{ notifications: messaging.unreadNotificationCount, chats: messaging.unreadMessageCount }} />
+      <BottomNavBar centerTab={{ id: "home", label: "Home", icon: "home-outline", activeIcon: "home" }} activeTab="profile" onTabPress={handleTabPress} badges={{ notifications: messaging.unreadNotificationCount, chats: messaging.unreadMessageCount }} />
 
       {/* Modals */}
       <EditProfileModal visible={editModalVisible} onClose={() => setEditModalVisible(false)} user={{ displayName: displayData.name, bio: displayData.bio, avatar: displayData.avatar }} onSave={handleSaveProfile} />

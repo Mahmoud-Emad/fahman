@@ -194,7 +194,6 @@ export function AddFriendModal({
       visible={visible}
       onClose={handleClose}
       title="Add Friend"
-      maxHeight="85%"
       padding="p-0"
     >
       {/* Search Section */}

@@ -313,6 +313,7 @@ model Message {
   recipientId String?     @map("recipient_id")
   text        String      @db.Text
   messageType MessageType @default(ROOM) @map("message_type")
+  metadata    Json?       @db.JsonB
   isRead      Boolean     @default(false) @map("is_read")
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -395,9 +396,10 @@ model Notification {
   title      String           @db.VarChar(100)
   message    String           @db.Text
   senderId   String?          @map("sender_id")
-  actionData Json?            @map("action_data")
-  isRead     Boolean          @default(false) @map("is_read")
-  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  actionData  Json?            @map("action_data")
+  isRead      Boolean          @default(false) @map("is_read")
+  actionTaken String?          @map("action_taken") @db.VarChar(20)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user   User  @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
   sender User? @relation("SentNotifications", fields: [senderId], references: [id], onDelete: SetNull)

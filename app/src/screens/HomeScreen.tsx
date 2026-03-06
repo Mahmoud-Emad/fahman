@@ -6,14 +6,14 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, Image, BackHandler, Modal as RNModal, Pressable, Animated } from "react-native";
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
-import { Text, Button, Icon } from "@/components/ui";
-import { TopNavBar, BottomNavBar, DEFAULT_TABS } from "@/components/navigation";
+import { Text, Button, Icon, Modal } from "@/components/ui";
+import { TopNavBar, BottomNavBar } from "@/components/navigation";
 import { WaveDivider, CreateOptionsModal, BuyCoinsModal } from "@/components/common";
 import { DecoCircle, FloatingBadge } from "@/components/decorative";
 import { PackSelectionModal } from "@/components/packs";
 import type { PackData } from "@/components/packs/types";
 import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
-import { ChatDetailsModal } from "@/components/messaging";
+import { ChatDetailsModal, NotificationsModal, ChatsListModal } from "@/components/messaging";
 import { MarketplaceModal } from "@/components/marketplace";
 import { useMessaging, useFriends, useAuth, usePacks } from "@/hooks";
 import { useToast } from "@/contexts";
@@ -148,12 +148,12 @@ export function HomeScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "Home">>();
   const { user, updateProfile, refreshUser } = useAuth();
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState("home");
   const [packModalVisible, setPackModalVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [buyCoinsVisible, setBuyCoinsVisible] = useState(false);
   const [marketplaceVisible, setMarketplaceVisible] = useState(false);
   const [exitDialogVisible, setExitDialogVisible] = useState(false);
+  const [helpVisible, setHelpVisible] = useState(false);
   const [localCoins, setLocalCoins] = useState(user?.coins ?? 0);
 
   // Handle hardware back button
@@ -236,16 +236,16 @@ export function HomeScreen() {
   }, [route.params?.openChatWith]);
 
   const handleTabPress = (tabId: string) => {
-    if (tabId === "edit") {
-      setCreateModalVisible(true);
+    if (tabId === "rooms") {
+      navigation.navigate("Rooms");
     } else if (tabId === "friends") {
       friendsHook.openFriendsList();
-    } else if (tabId === "marketplace") {
-      setMarketplaceVisible(true);
+    } else if (tabId === "chats") {
+      messaging.openChatsList();
+    } else if (tabId === "notifications") {
+      messaging.openNotifications();
     } else if (tabId === "profile") {
       navigation.navigate("Profile");
-    } else {
-      setActiveTab(tabId);
     }
   };
 
@@ -275,8 +275,10 @@ export function HomeScreen() {
       <TopNavBar
         coins={localCoins}
         onSettingsPress={handleSettingsPress}
-        onHelpPress={() => {}}
+        onHelpPress={() => setHelpVisible(true)}
         onCoinsPress={() => setBuyCoinsVisible(true)}
+        onCreatePress={() => setCreateModalVisible(true)}
+        onStorePress={() => setMarketplaceVisible(true)}
       />
 
       {/* Main Content */}
@@ -381,9 +383,13 @@ export function HomeScreen() {
 
       {/* Bottom Navigation Bar */}
       <BottomNavBar
-        tabs={DEFAULT_TABS}
-        activeTab={activeTab}
+        centerTab={{ id: "rooms", label: "Rooms", icon: "game-controller-outline", activeIcon: "game-controller" }}
+        activeTab="rooms"
         onTabPress={handleTabPress}
+        badges={{
+          notifications: messaging.unreadNotificationCount,
+          chats: messaging.unreadMessageCount,
+        }}
       />
 
       {/* Create Options Modal */}
@@ -452,6 +458,28 @@ export function HomeScreen() {
         }}
       />
 
+      {/* Notifications Modal */}
+      <NotificationsModal
+        visible={messaging.notificationsVisible}
+        onClose={() => messaging.setNotificationsVisible(false)}
+        notifications={messaging.notifications}
+        onNotificationPress={messaging.handleNotificationPress}
+        onNotificationAction={messaging.handleNotificationAction}
+        onMarkAllRead={messaging.handleMarkAllNotificationsRead}
+        onDelete={messaging.handleDeleteNotification}
+        onClearAll={messaging.handleClearReadNotifications}
+        isLoading={messaging.notificationsLoading}
+      />
+
+      {/* Chats List Modal */}
+      <ChatsListModal
+        visible={messaging.chatsListVisible}
+        onClose={() => messaging.setChatsListVisible(false)}
+        conversations={messaging.conversations}
+        onConversationPress={messaging.handleConversationPress}
+        isLoading={messaging.chatsLoading}
+      />
+
       {/* Chat Details Modal */}
       <ChatDetailsModal
         visible={messaging.chatDetailsVisible}
@@ -479,6 +507,112 @@ export function HomeScreen() {
         currentCoins={localCoins}
         onPurchase={handleCoinsPurchased}
       />
+
+      {/* Help Modal */}
+      <Modal
+        visible={helpVisible}
+        onClose={() => setHelpVisible(false)}
+        title="How to Play"
+        maxHeight="70%"
+      >
+        <View className="gap-5">
+          {/* Join a Game */}
+          <View className="flex-row">
+            <View
+              className="w-9 h-9 rounded-xl items-center justify-center mr-3 mt-0.5"
+              style={{ backgroundColor: withOpacity(colors.primary[500], 0.12) }}
+            >
+              <Icon name="game-controller" size="sm" color={colors.primary[500]} />
+            </View>
+            <View className="flex-1">
+              <Text variant="body" className="font-semibold mb-1">Join a Room</Text>
+              <Text variant="body-sm" color="secondary">
+                Tap "Join Room" to browse public rooms or enter a room code to join a private game with friends.
+              </Text>
+            </View>
+          </View>
+
+          {/* Host a Game */}
+          <View className="flex-row">
+            <View
+              className="w-9 h-9 rounded-xl items-center justify-center mr-3 mt-0.5"
+              style={{ backgroundColor: withOpacity(colors.success, 0.12) }}
+            >
+              <Icon name="add-circle" size="sm" color={colors.success} />
+            </View>
+            <View className="flex-1">
+              <Text variant="body" className="font-semibold mb-1">Host a Room</Text>
+              <Text variant="body-sm" color="secondary">
+                Tap "Host Room", pick a question pack, set your room options (public/private, max players), then share the code.
+              </Text>
+            </View>
+          </View>
+
+          {/* Gameplay */}
+          <View className="flex-row">
+            <View
+              className="w-9 h-9 rounded-xl items-center justify-center mr-3 mt-0.5"
+              style={{ backgroundColor: withOpacity(colors.info, 0.12) }}
+            >
+              <Icon name="help-circle" size="sm" color={colors.info} />
+            </View>
+            <View className="flex-1">
+              <Text variant="body" className="font-semibold mb-1">Answer & Bet</Text>
+              <Text variant="body-sm" color="secondary">
+                Each round shows a question with multiple choices. Pick your answer, then place a confidence bet. Higher bets = more points if correct, but you lose them if wrong.
+              </Text>
+            </View>
+          </View>
+
+          {/* Create Packs */}
+          <View className="flex-row">
+            <View
+              className="w-9 h-9 rounded-xl items-center justify-center mr-3 mt-0.5"
+              style={{ backgroundColor: withOpacity(colors.gold, 0.15) }}
+            >
+              <Icon name="create" size="sm" color={colors.gold} />
+            </View>
+            <View className="flex-1">
+              <Text variant="body" className="font-semibold mb-1">Create a Pack</Text>
+              <Text variant="body-sm" color="secondary">
+                Tap the + button in the top bar to create your own question pack. Add questions, set categories, and share it with others.
+              </Text>
+            </View>
+          </View>
+
+          {/* Friends */}
+          <View className="flex-row">
+            <View
+              className="w-9 h-9 rounded-xl items-center justify-center mr-3 mt-0.5"
+              style={{ backgroundColor: withOpacity(colors.primary[500], 0.12) }}
+            >
+              <Icon name="people" size="sm" color={colors.primary[500]} />
+            </View>
+            <View className="flex-1">
+              <Text variant="body" className="font-semibold mb-1">Add Friends</Text>
+              <Text variant="body-sm" color="secondary">
+                Use the Friends tab to add players by Game ID. Chat, invite them to rooms, or challenge them directly.
+              </Text>
+            </View>
+          </View>
+
+          {/* Coins */}
+          <View className="flex-row">
+            <View
+              className="w-9 h-9 rounded-xl items-center justify-center mr-3 mt-0.5"
+              style={{ backgroundColor: withOpacity(colors.gold, 0.15) }}
+            >
+              <Icon name="diamond" size="sm" color={colors.gold} />
+            </View>
+            <View className="flex-1">
+              <Text variant="body" className="font-semibold mb-1">Earn Coins</Text>
+              <Text variant="body-sm" color="secondary">
+                Win games to earn coins. Use coins in the Store to unlock avatars and other items.
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Exit Confirmation Modal */}
       <ExitConfirmationModal

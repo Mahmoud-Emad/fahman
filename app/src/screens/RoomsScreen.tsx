@@ -2,11 +2,11 @@
  * RoomsScreen - Display list of rooms created by users
  * Features: Smart event section with dynamic colors, carousel, user info, search
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, ScrollView, RefreshControl } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
-import { BottomNavBar, ROOM_LIST_TABS } from "@/components/navigation";
+import { BottomNavBar } from "@/components/navigation";
 import {
   RoomsHeader,
   RoomFilters,
@@ -23,13 +23,14 @@ import {
 import type { Room } from "@/services/roomsService";
 import { PackSelectionModal } from "@/components/packs";
 import type { PackData } from "@/components/packs/types";
+import { CreateOptionsModal, BuyCoinsModal } from "@/components/common";
 import {
   NotificationsModal,
   ChatsListModal,
   ChatDetailsModal,
 } from "@/components/messaging";
-import { BuyCoinsModal } from "@/components/common";
-import { useMessaging, useAuth, usePacks } from "@/hooks";
+import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
+import { useMessaging, useFriends, useAuth, usePacks } from "@/hooks";
 import { storeService } from "@/services/storeService";
 import { useToast } from "@/contexts";
 import { colors } from "@/themes";
@@ -46,18 +47,34 @@ export function RoomsScreen() {
   const { user, refreshUser } = useAuth();
   const toast = useToast();
   const [packModalVisible, setPackModalVisible] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [buyCoinsVisible, setBuyCoinsVisible] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [localCoins, setLocalCoins] = useState(user?.coins ?? 0);
 
   // Use centralized hooks
   const messaging = useMessaging();
+  const friendsHook = useFriends();
   const packsHook = usePacks();
 
   // Sync local coins with user
   useEffect(() => {
     setLocalCoins(user?.coins ?? 0);
   }, [user?.coins]);
+
+  // Coordinate friend press with chat opening
+  useEffect(() => {
+    if (friendsHook.pendingChatFriend) {
+      const friend = friendsHook.pendingChatFriend;
+      friendsHook.clearPendingChatFriend();
+      messaging.openDirectChat({
+        id: friend.id,
+        name: friend.name,
+        initials: friend.initials,
+        avatar: friend.avatar,
+      });
+    }
+  }, [friendsHook.pendingChatFriend]);
 
   const handleCoinsPurchased = async (packageId: string) => {
     try {
@@ -134,7 +151,15 @@ export function RoomsScreen() {
     myRoomsLoading,
     onRefresh,
     handleScrollEnd,
+    refreshSilently,
   } = useRoomData();
+
+  // Refresh room data when screen gains focus (e.g. after leaving a room)
+  useFocusEffect(
+    useCallback(() => {
+      refreshSilently();
+    }, [refreshSilently])
+  );
 
   // Room filters
   const {
@@ -169,8 +194,10 @@ export function RoomsScreen() {
 
   // Tab navigation
   const handleTabPress = (tabId: string) => {
-    if (tabId === "home") {
-      navigation.goBack();
+    if (tabId === "create") {
+      setCreateModalVisible(true);
+    } else if (tabId === "friends") {
+      friendsHook.openFriendsList();
     } else if (tabId === "chats") {
       messaging.openChatsList();
     } else if (tabId === "notifications") {
@@ -293,13 +320,21 @@ export function RoomsScreen() {
 
       {/* Bottom Navigation */}
       <BottomNavBar
-        tabs={ROOM_LIST_TABS}
-        activeTab="rooms"
+        centerTab={{ id: "create", label: "Create", icon: "add-circle-outline", activeIcon: "add-circle" }}
+        activeTab=""
         onTabPress={handleTabPress}
         badges={{
           notifications: messaging.unreadNotificationCount,
           chats: messaging.unreadMessageCount,
         }}
+      />
+
+      {/* Create Options Modal */}
+      <CreateOptionsModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onCreateRoom={handleHostPress}
+        onCreatePack={handleCreatePack}
       />
 
       {/* Pack Selection Modal */}
@@ -312,6 +347,38 @@ export function RoomsScreen() {
         ownedPacks={packsHook.ownedPacks}
         popularPacks={packsHook.popularPacks}
         isLoading={packsHook.isLoading}
+      />
+
+      {/* Friends List Modal */}
+      <FriendsListModal
+        visible={friendsHook.friendsListVisible}
+        onClose={() => friendsHook.setFriendsListVisible(false)}
+        friends={friendsHook.friends}
+        friendRequests={friendsHook.friendRequests}
+        sentRequests={friendsHook.sentRequests}
+        onFriendPress={friendsHook.handleFriendPress}
+        onMessageFriend={friendsHook.handleMessageFriend}
+        onInviteFriend={friendsHook.handleInviteFriend}
+        onAcceptRequest={friendsHook.handleAcceptFriendRequest}
+        onDeclineRequest={friendsHook.handleDeclineFriendRequest}
+        onCancelRequest={friendsHook.handleCancelFriendRequest}
+        onAddFriend={friendsHook.handleAddFriend}
+        isLoading={friendsHook.friendsLoading}
+      />
+
+      {/* Add Friend Modal */}
+      <AddFriendModal
+        visible={friendsHook.addFriendVisible}
+        onClose={() => friendsHook.setAddFriendVisible(false)}
+        onCloseAll={friendsHook.closeAllModals}
+        onFriendAdded={friendsHook.handleFriendAdded}
+      />
+
+      {/* Create Game Dialog (Play with Friend) */}
+      <CreateGameDialog
+        visible={!!friendsHook.playFriend}
+        friend={friendsHook.playFriend}
+        onClose={() => friendsHook.setPlayFriend(null)}
       />
 
       {/* Notifications Modal */}

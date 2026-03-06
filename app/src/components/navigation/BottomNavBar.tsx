@@ -1,6 +1,6 @@
 /**
- * BottomNavBar component - Flexible bottom navigation with context-based tabs
- * Supports: Room List, Lobby, and default configurations
+ * BottomNavBar component - Unified bottom navigation
+ * 4 fixed tabs + 1 configurable center button that changes per screen
  */
 import React from "react";
 import { View, Pressable } from "react-native";
@@ -17,59 +17,35 @@ interface TabConfig {
   label: string;
   icon: IconName;
   activeIcon: IconName;
-  isCenter?: boolean;
-  isDestructive?: boolean;
 }
 
 /**
- * Room List tabs: Home | Chats | Rooms (center) | Notifications | Profile
+ * Configurable center tab — changes per screen
  */
-export const ROOM_LIST_TABS: TabConfig[] = [
-  { id: "home", label: "Home", icon: "home-outline", activeIcon: "home" },
-  { id: "chats", label: "Chats", icon: "chatbubbles-outline", activeIcon: "chatbubbles" },
-  { id: "rooms", label: "Rooms", icon: "game-controller-outline", activeIcon: "game-controller", isCenter: true },
-  { id: "notifications", label: "Alerts", icon: "notifications-outline", activeIcon: "notifications" },
-  { id: "profile", label: "Profile", icon: "person-outline", activeIcon: "person" },
-];
+export interface CenterTabConfig {
+  id: string;
+  label: string;
+  icon: IconName;
+  activeIcon: IconName;
+}
 
 /**
- * Lobby tabs: Leave | Chats | Notifications | Profile
+ * The 4 fixed tabs (same on every screen)
  */
-export const LOBBY_TABS: TabConfig[] = [
-  { id: "leave", label: "Leave", icon: "log-out-outline", activeIcon: "log-out", isDestructive: true },
-  { id: "chats", label: "Chats", icon: "chatbubbles-outline", activeIcon: "chatbubbles" },
-  { id: "notifications", label: "Alerts", icon: "notifications-outline", activeIcon: "notifications" },
-  { id: "profile", label: "Profile", icon: "person-outline", activeIcon: "person" },
-];
-
-/**
- * Default tabs (original configuration)
- */
-export const DEFAULT_TABS: TabConfig[] = [
-  { id: "edit", label: "Create", icon: "create-outline", activeIcon: "create" },
+export const BASE_TABS: TabConfig[] = [
   { id: "friends", label: "Friends", icon: "people-outline", activeIcon: "people" },
-  { id: "home", label: "Home", icon: "home-outline", activeIcon: "home", isCenter: true },
-  { id: "marketplace", label: "Store", icon: "storefront-outline", activeIcon: "storefront" },
-  { id: "profile", label: "Profile", icon: "person-outline", activeIcon: "person" },
-];
-
-/**
- * Profile tabs: Home | Chats | Profile (center) | Notifications | Friends
- */
-export const PROFILE_TABS: TabConfig[] = [
-  { id: "home", label: "Home", icon: "home-outline", activeIcon: "home" },
   { id: "chats", label: "Chats", icon: "chatbubbles-outline", activeIcon: "chatbubbles" },
-  { id: "profile", label: "Profile", icon: "person-outline", activeIcon: "person", isCenter: true },
+  // Center slot is inserted dynamically
   { id: "notifications", label: "Alerts", icon: "notifications-outline", activeIcon: "notifications" },
-  { id: "friends", label: "Friends", icon: "people-outline", activeIcon: "people" },
+  { id: "profile", label: "Profile", icon: "person-outline", activeIcon: "person" },
 ];
 
 /**
  * Props for the BottomNavBar component
  */
 export interface BottomNavBarProps {
-  /** Tab configuration to use */
-  tabs?: TabConfig[];
+  /** Configurable center button */
+  centerTab: CenterTabConfig;
   /** Currently active tab */
   activeTab: string;
   /** Callback when a tab is pressed */
@@ -82,12 +58,21 @@ export interface BottomNavBarProps {
  * BottomNavBar component
  */
 export function BottomNavBar({
-  tabs = DEFAULT_TABS,
+  centerTab,
   activeTab,
   onTabPress,
   badges = {},
 }: BottomNavBarProps) {
   const insets = useSafeAreaInsets();
+
+  // Build the full tab list: [friends, chats, CENTER, alerts, profile]
+  const allTabs = [
+    BASE_TABS[0],
+    BASE_TABS[1],
+    { ...centerTab, isCenter: true as const },
+    BASE_TABS[2],
+    BASE_TABS[3],
+  ];
 
   return (
     <View
@@ -95,19 +80,14 @@ export function BottomNavBar({
       style={{ paddingBottom: insets.bottom }}
     >
       <View className="flex-row items-center justify-around py-2">
-        {tabs.map((tab) => {
+        {allTabs.map((tab) => {
           const isActive = activeTab === tab.id;
-          const isCenter = tab.isCenter;
-          const isDestructive = tab.isDestructive;
+          const isCenter = "isCenter" in tab && tab.isCenter;
           const badgeCount = badges[tab.id] || 0;
 
-          // Determine tab color
-          let tabColor: string = isActive ? colors.primary[500] : colors.neutral[400];
-          if (isDestructive) {
-            tabColor = colors.error;
-          }
+          const tabColor: string = isActive ? colors.primary[500] : colors.neutral[400];
 
-          // Center tab styling
+          // Center tab styling — always prominent primary style
           if (isCenter) {
             return (
               <Pressable
@@ -122,9 +102,9 @@ export function BottomNavBar({
                   style={{
                     width: 60,
                     height: 60,
-                    backgroundColor: isActive ? colors.primary[500] : colors.white,
+                    backgroundColor: colors.primary[500],
                     borderWidth: 3,
-                    borderColor: isActive ? colors.primary[600] : colors.neutral[200],
+                    borderColor: colors.primary[600],
                     shadowColor: colors.black,
                     shadowOffset: { width: 0, height: 2 },
                     shadowOpacity: 0.15,
@@ -133,8 +113,8 @@ export function BottomNavBar({
                   }}
                 >
                   <Icon
-                    name={isActive ? tab.activeIcon : tab.icon}
-                    color={isActive ? colors.white : colors.neutral[500]}
+                    name={tab.activeIcon}
+                    color={colors.white}
                     size="lg"
                   />
                 </View>
@@ -142,7 +122,7 @@ export function BottomNavBar({
                   variant="caption"
                   className="mt-1"
                   style={{
-                    color: isActive ? colors.primary[500] : colors.neutral[400],
+                    color: colors.primary[500],
                     fontSize: 10,
                   }}
                 >
@@ -203,8 +183,3 @@ export function BottomNavBar({
     </View>
   );
 }
-
-/**
- * Legacy type exports for backwards compatibility
- */
-export type TabId = "home" | "edit" | "marketplace" | "friends" | "profile";

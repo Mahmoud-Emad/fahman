@@ -101,7 +101,6 @@ export function NotificationsModal({
       visible={visible}
       onClose={onClose}
       title=""
-      maxHeight="85%"
       padding="p-0"
     >
       {/* Custom Header */}
@@ -122,8 +121,8 @@ export function NotificationsModal({
         )}
       </View>
 
-      {/* Notifications List - fixed height ensures consistent modal size */}
-      <View style={{ height: 400 }}>
+      {/* Notifications List */}
+      <View style={{ flex: 1 }}>
         {/* Loading skeleton with fade out */}
         <Animated.View
           style={{

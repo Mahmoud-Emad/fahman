@@ -146,6 +146,35 @@ export class RoomService {
   }
 
   /**
+   * Search rooms by title or code
+   */
+  async searchRooms(query: string, limit: number = 20) {
+    return await prisma.room.findMany({
+      where: {
+        isPublic: true,
+        status: { in: ['WAITING', 'PLAYING'] },
+        OR: [
+          { title: { contains: query, mode: 'insensitive' } },
+          { code: { equals: query.toUpperCase() } },
+        ],
+      },
+      take: limit,
+      include: {
+        creator: {
+          select: { id: true, username: true, displayName: true, avatar: true },
+        },
+        selectedPack: {
+          select: { id: true, title: true, category: true, difficulty: true },
+        },
+        _count: {
+          select: { members: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
    * Get popular/active rooms
    */
   async getPopularRooms(limit: number = 10) {

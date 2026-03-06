@@ -5,7 +5,7 @@
  */
 import React from "react";
 import { View, Pressable, Modal as RNModal } from "react-native";
-import { Text, Icon, Button } from "@/components/ui";
+import { Text, Icon, Button, type IconName } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 
 interface LeaveConfirmDialogProps {
@@ -19,6 +19,10 @@ interface LeaveConfirmDialogProps {
   title?: string;
   /** Dialog message */
   message?: string;
+  /** Confirm button label */
+  confirmLabel?: string;
+  /** Icon name in the warning circle */
+  icon?: IconName;
 }
 
 /**
@@ -31,6 +35,8 @@ export function LeaveConfirmDialog({
   onConfirm,
   title = "Leave Room?",
   message = "Are you sure you want to leave this room? You can rejoin later if the game is still active.",
+  confirmLabel = "Leave",
+  icon = "log-out",
 }: LeaveConfirmDialogProps) {
   if (!visible) return null;
 
@@ -65,7 +71,7 @@ export function LeaveConfirmDialog({
               className="w-16 h-16 rounded-full items-center justify-center mb-4"
               style={{ backgroundColor: withOpacity(colors.error, 0.1) }}
             >
-              <Icon name="log-out" size="xl" color={colors.error} />
+              <Icon name={icon} size="xl" color={colors.error} />
             </View>
 
             <Text variant="h3" className="font-bold text-center px-4">
@@ -96,7 +102,7 @@ export function LeaveConfirmDialog({
               onPress={onConfirm}
               className="flex-1"
             >
-              Leave
+              {confirmLabel}
             </Button>
           </View>
         </Pressable>

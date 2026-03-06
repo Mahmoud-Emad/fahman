@@ -114,6 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               isInitializing: false,
               isNewUser: false,
             });
+
+            // Connect to WebSocket after restoring session
+            socketService.connect().catch(() => {});
+
             return;
           }
         } catch (error) {
@@ -130,6 +134,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 isInitializing: false,
                 isNewUser: false,
               });
+
+              // Connect to WebSocket after restoring session via refresh
+              socketService.connect().catch(() => {});
+
               return;
             }
           } catch (refreshError) {

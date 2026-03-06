@@ -15,6 +15,7 @@ import { transformUrl } from "@/utils/transformUrl";
 import { colors } from "@/themes";
 import { UserProfileHeader } from "@/components/profile/UserProfileHeader";
 import { UserProfileContent } from "@/components/profile/UserProfileContent";
+import { LeaveConfirmDialog } from "@/components/common";
 import type { RootStackParamList } from "../../App";
 
 // Animation constants
@@ -62,6 +63,7 @@ export function UserProfileScreen() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   useEffect(() => {
     const unsubOnline = socketService.onFriendOnline(({ userId: onlineId }) => {
@@ -286,7 +288,7 @@ export function UserProfileScreen() {
         onAddFriend={handleAddFriend}
         onCancelRequest={handleCancelRequest}
         onAcceptRequest={handleAcceptRequest}
-        onRemoveFriend={handleRemoveFriend}
+        onRemoveFriend={() => setShowRemoveConfirm(true)}
         onShare={handleShare}
       />
 
@@ -307,6 +309,19 @@ export function UserProfileScreen() {
       >
         <UserProfileContent displayData={displayData} statsLoading={statsLoading} />
       </Animated.ScrollView>
+
+      <LeaveConfirmDialog
+        visible={showRemoveConfirm}
+        onClose={() => setShowRemoveConfirm(false)}
+        onConfirm={() => {
+          setShowRemoveConfirm(false);
+          handleRemoveFriend();
+        }}
+        title="Remove Friend?"
+        message={`Are you sure you want to remove ${displayData.name} from your friends?`}
+        confirmLabel="Remove"
+        icon="person-remove"
+      />
     </View>
   );
 }

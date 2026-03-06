@@ -91,6 +91,12 @@ export {
   type Segment,
 } from "./SegmentedControl";
 
+// In-App Notification
+export {
+  InAppNotificationBanner,
+  type InAppNotificationBannerProps,
+} from "./InAppNotificationBanner";
+
 // Skeleton Loading
 export {
   Skeleton,

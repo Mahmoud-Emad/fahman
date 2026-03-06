@@ -53,12 +53,20 @@ export class RoomMembersService {
       }
     }
 
-    // Add member to room
+    // Add member to room (upsert handles rejoining after a previous leave)
     const [member] = await prisma.$transaction([
-      prisma.roomMember.create({
-        data: {
+      prisma.roomMember.upsert({
+        where: { roomId_userId: { roomId, userId } },
+        create: {
           roomId,
           userId,
+          role: 'MEMBER',
+        },
+        update: {
+          isActive: true,
+          leftAt: null,
+          score: 0,
+          isReady: false,
           role: 'MEMBER',
         },
         include: {
@@ -127,8 +135,8 @@ export class RoomMembersService {
       throw new NotFoundError('Room not found');
     }
 
-    // If creator is leaving and room is waiting, close the room
-    if (room.creatorId === userId && room.status === 'WAITING') {
+    // If creator is leaving, close the room regardless of status
+    if (room.creatorId === userId) {
       await prisma.$transaction([
         prisma.roomMember.updateMany({
           where: { roomId, isActive: true },
@@ -139,10 +147,11 @@ export class RoomMembersService {
           data: { status: 'CLOSED', currentPlayers: 0 },
         }),
       ]);
-      return { closed: true };
+      return { closed: true, currentPlayers: 0, status: 'CLOSED' };
     }
 
     // Regular member leaving
+    const newPlayerCount = Math.max(0, room.currentPlayers - 1);
     await prisma.$transaction([
       prisma.roomMember.update({
         where: { id: member.id },
@@ -154,7 +163,7 @@ export class RoomMembersService {
       }),
     ]);
 
-    return { closed: false };
+    return { closed: false, currentPlayers: newPlayerCount, status: room.status };
   }
 
   /**
@@ -187,6 +196,7 @@ export class RoomMembersService {
       throw new NotFoundError('Player not found in this room');
     }
 
+    const newPlayerCount = Math.max(0, room.currentPlayers - 1);
     await prisma.$transaction([
       prisma.roomMember.update({
         where: { id: member.id },
@@ -198,7 +208,7 @@ export class RoomMembersService {
       }),
     ]);
 
-    return { success: true };
+    return { success: true, currentPlayers: newPlayerCount, status: room.status };
   }
 
   /**

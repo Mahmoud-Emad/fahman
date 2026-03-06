@@ -6,7 +6,7 @@ import express from 'express';
 import * as notificationController from '../controllers/notificationController';
 import { authenticate } from '../middlewares/auth';
 import { validate, validateUUID, validateQuery } from '../middlewares/validation';
-import { sendRoomInvitesSchema } from '../validators/notificationValidator';
+import { sendRoomInvitesSchema, resolveActionSchema } from '../validators/notificationValidator';
 import { paginationSchema } from '../validators/paginationValidator';
 
 const router = express.Router();
@@ -227,6 +227,48 @@ router.post('/read-all', authenticate, notificationController.markAllAsRead);
  *         description: Unauthorized
  */
 router.post('/room-invite', authenticate, validate(sendRoomInvitesSchema), notificationController.sendRoomInvites);
+
+/**
+ * @openapi
+ * /api/notifications/{id}/action:
+ *   patch:
+ *     tags:
+ *       - Notifications
+ *     summary: Resolve notification action
+ *     description: Mark a notification's action as taken (e.g., accepted, declined, joined)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Notification UUID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - action
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [accepted, declined, joined]
+ *     responses:
+ *       200:
+ *         description: Notification action resolved
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Cannot access this notification
+ *       404:
+ *         description: Notification not found
+ */
+router.patch('/:id/action', authenticate, validateUUID('id'), validate(resolveActionSchema), notificationController.resolveAction);
 
 /**
  * @openapi

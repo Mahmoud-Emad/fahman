@@ -234,10 +234,21 @@ export function useFriends(): UseFriendsReturn {
       );
     });
 
+    // Auto-request friend statuses when socket connects
+    const unsubConnect = socketService.onConnect(() => {
+      socketService.requestFriendStatuses();
+    });
+
+    // Also request immediately if already connected
+    if (socketService.isConnected) {
+      socketService.requestFriendStatuses();
+    }
+
     return () => {
       unsubOnline();
       unsubOffline();
       unsubStatusList();
+      unsubConnect();
     };
   }, []);
 

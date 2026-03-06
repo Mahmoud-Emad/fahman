@@ -130,6 +130,33 @@ router.get('/code/:code', roomController.getRoomByCode);
 
 /**
  * @openapi
+ * /api/rooms/search:
+ *   get:
+ *     tags:
+ *       - Rooms
+ *     summary: Search rooms
+ *     description: Search rooms by title or code
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search query (room title or code)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Max results to return
+ *     responses:
+ *       200:
+ *         description: List of matching rooms
+ */
+router.get('/search', roomController.searchRooms);
+
+/**
+ * @openapi
  * /api/rooms/{id}:
  *   get:
  *     tags:

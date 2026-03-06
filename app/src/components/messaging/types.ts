@@ -65,6 +65,7 @@ export interface Notification {
   isRead: boolean;
   sender?: NotificationSender;
   actionData?: NotificationActionData;
+  actionTaken?: string | null;
 }
 
 // ==================== CONVERSATIONS ====================
@@ -126,6 +127,7 @@ export interface RoomInviteData {
   isActive: boolean;
   currentPlayers: number;
   maxPlayers: number;
+  expiredReason?: 'deleted' | 'full' | 'in_progress' | 'finished' | 'closed' | null;
 }
 
 /**

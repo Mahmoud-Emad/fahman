@@ -44,7 +44,7 @@ function FeatureItem({ icon, title, description }: FeatureItemProps) {
  */
 export function CoinsModal({ visible, onClose, coins }: CoinsModalProps) {
   return (
-    <Modal visible={visible} onClose={onClose} title="Fahman Coins" maxHeight="70%">
+    <Modal visible={visible} onClose={onClose} title="Fahman Coins">
       <View>
         {/* Coins Balance */}
         <View

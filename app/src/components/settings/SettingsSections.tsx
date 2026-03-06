@@ -8,7 +8,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { RootStackParamList } from "../../../App";
 import { Text, Icon, Divider, ExpandablePanel } from "@/components/ui";
-import { SettingToggle, ActionRow } from "@/components/settings";
+import { SettingToggle } from "./SettingToggle";
+import { ActionRow } from "./ActionRow";
 import { colors, withOpacity } from "@/themes";
 import type { UserSettings } from "@/services/settingsService";
 

@@ -10,4 +10,6 @@ export { LobbyView } from "./LobbyView";
 export { ShareRoomModal } from "./ShareRoomModal";
 export { UserSelectModal, type InviteUser } from "./UserSelectModal";
 export { LobbyPlayerList } from "./LobbyPlayerList";
+export { LobbyHeader } from "./LobbyHeader";
 export { LobbyChatPanel } from "./LobbyChatPanel";
+export { LobbyChatModal } from "./LobbyChatModal";

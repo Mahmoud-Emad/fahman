@@ -138,6 +138,17 @@ export const PACK_LIMITS = {
 } as const;
 
 /**
+ * Modal size configuration (as fractions of screen height)
+ * Change these values to resize all modals across the app
+ */
+export const MODAL_SIZES = {
+  /** Default modal height — 75% of screen */
+  DEFAULT_HEIGHT: 0.75,
+  /** Modal height when keyboard is visible — 50% of screen */
+  KEYBOARD_HEIGHT: 0.50,
+} as const;
+
+/**
  * Room configuration limits
  */
 export const ROOM_LIMITS = {

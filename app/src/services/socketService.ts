@@ -103,6 +103,8 @@ export interface DirectMessage {
   text: string;
   timestamp: Date;
   type: 'PRIVATE' | 'ROOM_INVITE';
+  roomCode?: string;
+  roomTitle?: string;
 }
 
 export interface NotificationData {
@@ -122,6 +124,11 @@ export interface NotificationData {
   } | null;
 }
 
+export interface NotificationUpdateData {
+  id: string;
+  actionTaken: string;
+}
+
 // Event listener types
 type ConnectionSuccessHandler = (data: { userId: string; username: string }) => void;
 type ConnectionErrorHandler = (data: { message: string }) => void;
@@ -133,6 +140,7 @@ type PlayerReadyHandler = (data: { roomId: string; playerId: string; isReady: bo
 type RoomUpdatedHandler = (data: { roomId: string; updates: Partial<RoomInfo> }) => void;
 type RoomClosedHandler = (data: { roomId: string; reason: string }) => void;
 type RoomKickedHandler = (data: { roomId: string; reason: string }) => void;
+type RoomListUpdateHandler = (data: { roomId: string; currentPlayers: number; status: string }) => void;
 type GameStartedHandler = (data: GameStartedData) => void;
 type QuestionHandler = (data: QuestionData) => void;
 type PlayerAnsweredHandler = (data: { roomId: string; playerId: string }) => void;
@@ -146,6 +154,7 @@ type FriendOnlineHandler = (data: { userId: string }) => void;
 type FriendOfflineHandler = (data: { userId: string }) => void;
 type FriendStatusListHandler = (data: { online: string[] }) => void;
 type NotificationHandler = (data: NotificationData) => void;
+type NotificationUpdateHandler = (data: NotificationUpdateData) => void;
 type DirectMessageHandler = (data: DirectMessage) => void;
 type DmTypingHandler = (data: { senderId: string; senderName: string }) => void;
 type DmReadHandler = (data: { byUserId: string }) => void;
@@ -169,6 +178,7 @@ class SocketService {
     roomUpdated: new Set<RoomUpdatedHandler>(),
     roomClosed: new Set<RoomClosedHandler>(),
     roomKicked: new Set<RoomKickedHandler>(),
+    roomListUpdate: new Set<RoomListUpdateHandler>(),
     gameStarted: new Set<GameStartedHandler>(),
     question: new Set<QuestionHandler>(),
     playerAnswered: new Set<PlayerAnsweredHandler>(),
@@ -183,6 +193,7 @@ class SocketService {
     friendOffline: new Set<FriendOfflineHandler>(),
     friendStatusList: new Set<FriendStatusListHandler>(),
     notification: new Set<NotificationHandler>(),
+    notificationUpdate: new Set<NotificationUpdateHandler>(),
     directMessage: new Set<DirectMessageHandler>(),
     dmTyping: new Set<DmTypingHandler>(),
     dmStopTyping: new Set<DmTypingHandler>(),
@@ -302,6 +313,10 @@ class SocketService {
       this.listeners.roomKicked.forEach((handler) => handler(data));
     });
 
+    this.socket.on('room:listUpdate', (data) => {
+      this.listeners.roomListUpdate.forEach((handler) => handler(data));
+    });
+
     // Game events
     this.socket.on('game:started', (data) => {
       this.listeners.gameStarted.forEach((handler) => handler(data));
@@ -360,6 +375,10 @@ class SocketService {
     // Notification events
     this.socket.on('notification:new', (data) => {
       this.listeners.notification.forEach((handler) => handler(data));
+    });
+
+    this.socket.on('notification:updated', (data) => {
+      this.listeners.notificationUpdate.forEach((handler) => handler(data));
     });
 
     // Direct message events
@@ -544,6 +563,11 @@ class SocketService {
     return () => this.listeners.roomKicked.delete(handler);
   }
 
+  onRoomListUpdate(handler: RoomListUpdateHandler): () => void {
+    this.listeners.roomListUpdate.add(handler);
+    return () => this.listeners.roomListUpdate.delete(handler);
+  }
+
   onGameStarted(handler: GameStartedHandler): () => void {
     this.listeners.gameStarted.add(handler);
     return () => this.listeners.gameStarted.delete(handler);
@@ -612,6 +636,11 @@ class SocketService {
   onNotification(handler: NotificationHandler): () => void {
     this.listeners.notification.add(handler);
     return () => this.listeners.notification.delete(handler);
+  }
+
+  onNotificationUpdate(handler: NotificationUpdateHandler): () => void {
+    this.listeners.notificationUpdate.add(handler);
+    return () => this.listeners.notificationUpdate.delete(handler);
   }
 
   onDirectMessage(handler: DirectMessageHandler): () => void {
