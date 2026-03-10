@@ -26,6 +26,7 @@ interface UseRoomDataReturn {
   loadMoreRooms: () => Promise<void>;
   handleScrollEnd: (event: any) => void;
   fetchMyRooms: () => Promise<void>;
+  refreshSilently: () => Promise<void>;
 }
 
 /**
@@ -82,8 +83,7 @@ export function useRoomData(): UseRoomDataReturn {
       } else {
         setRooms([]);
       }
-    } catch (error) {
-      console.error("Error fetching popular rooms:", error);
+    } catch {
       setRooms([]);
     }
   };
@@ -112,8 +112,7 @@ export function useRoomData(): UseRoomDataReturn {
           hasMoreRooms.current = false;
         }
       }
-    } catch (error) {
-      console.error("Error fetching explore rooms:", error);
+    } catch {
       if (!append) {
         setExploreRooms([]);
       }
@@ -132,8 +131,7 @@ export function useRoomData(): UseRoomDataReturn {
       } else {
         setMyRooms([]);
       }
-    } catch (error) {
-      console.error("Error fetching my rooms:", error);
+    } catch {
       setMyRooms([]);
     } finally {
       setMyRoomsLoading(false);

@@ -53,7 +53,7 @@ function WaveCutout() {
 
 interface RoomsHeaderProps {
   events: EventData[];
-  userAvatar?: any;
+  userAvatar?: string;
   userInitials?: string;
   coins: number;
   onSearchPress?: () => void;

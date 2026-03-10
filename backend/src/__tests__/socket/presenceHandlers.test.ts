@@ -1,8 +1,9 @@
 /**
  * Presence Handlers Unit Tests
+ * Tests Redis-backed presence tracking and friend notifications
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -12,10 +13,45 @@ const aliceBobFriendship = { userId: 'user-1', friendId: 'user-2' };
 const aliceCarolFriendship = { userId: 'user-1', friendId: 'user-3' };
 
 // ---------------------------------------------------------------------------
+// Redis mock — tracks keys in memory to simulate Redis behavior
+// ---------------------------------------------------------------------------
+
+const redisStore = new Map<string, string>();
+
+const mockRedis = {
+  set: mock(async (key: string, value: string, _ex?: string, _ttl?: number) => {
+    redisStore.set(key, value);
+    return 'OK';
+  }),
+  del: mock(async (key: string) => {
+    const existed = redisStore.has(key) ? 1 : 0;
+    redisStore.delete(key);
+    return existed;
+  }),
+  exists: mock(async (key: string) => {
+    return redisStore.has(key) ? 1 : 0;
+  }),
+  expire: mock(async () => 1),
+  pipeline: mock(() => {
+    const commands: Array<() => Promise<[null, number]>> = [];
+    return {
+      exists: (key: string) => {
+        commands.push(async () => [null, redisStore.has(key) ? 1 : 0]);
+      },
+      exec: async () => {
+        return Promise.all(commands.map((cmd) => cmd()));
+      },
+    };
+  }),
+};
+
+// ---------------------------------------------------------------------------
 // Prisma mock
 // ---------------------------------------------------------------------------
 
-const mockFriendshipFindMany = mock(() => Promise.resolve([aliceBobFriendship, aliceCarolFriendship]));
+const mockFriendshipFindMany = mock(() =>
+  Promise.resolve([aliceBobFriendship, aliceCarolFriendship])
+);
 
 mock.module('../../config/database', () => ({
   prisma: {
@@ -25,7 +61,11 @@ mock.module('../../config/database', () => ({
   },
 }));
 
-mock.module('../../utils/logger', () => ({
+mock.module('../../config/redis', () => ({
+  getRedis: () => mockRedis,
+}));
+
+mock.module('../../shared/utils/logger', () => ({
   default: {
     info: () => {},
     error: () => {},
@@ -36,9 +76,9 @@ mock.module('../../utils/logger', () => ({
 
 // Import after mocking
 import {
-  onlineUsers,
   trackUserOnline,
   trackUserOffline,
+  isUserOnline,
   getOnlineFriends,
   notifyFriendsOnline,
   notifyFriendsOffline,
@@ -67,9 +107,6 @@ function createMockIO(sockets: Array<ReturnType<typeof createMockSocket>> = []) 
     sockets: {
       sockets: socketMap,
     },
-    _addSocket: (socket: ReturnType<typeof createMockSocket>) => {
-      socketMap.set(`socket-${socketMap.size}`, socket);
-    },
   };
 }
 
@@ -79,8 +116,10 @@ function createMockIO(sockets: Array<ReturnType<typeof createMockSocket>> = []) 
 
 describe('Presence Handlers', () => {
   beforeEach(() => {
-    // Clear online users between tests
-    onlineUsers.clear();
+    redisStore.clear();
+    mockRedis.set.mockClear();
+    mockRedis.del.mockClear();
+    mockRedis.exists.mockClear();
     mockFriendshipFindMany.mockReset();
     mockFriendshipFindMany.mockResolvedValue([aliceBobFriendship, aliceCarolFriendship] as any);
   });
@@ -89,19 +128,19 @@ describe('Presence Handlers', () => {
   // trackUserOnline
   // =========================================================================
   describe('trackUserOnline', () => {
-    it('should add user to onlineUsers set', () => {
+    it('should set presence key in Redis', async () => {
       const io = createMockIO();
 
-      trackUserOnline(io as any, 'user-1');
+      await trackUserOnline(io as any, 'user-1');
 
-      expect(onlineUsers.has('user-1')).toBe(true);
+      expect(redisStore.has('presence:user-1')).toBe(true);
     });
 
     it('should notify friends when a user comes online for the first time', async () => {
       const bobSocket = createMockSocket('user-2');
       const io = createMockIO([bobSocket]);
 
-      trackUserOnline(io as any, 'user-1');
+      await trackUserOnline(io as any, 'user-1');
 
       // Give async notifyFriendsOnline time to complete
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -115,9 +154,9 @@ describe('Presence Handlers', () => {
       const bobSocket = createMockSocket('user-2');
       const io = createMockIO([bobSocket]);
 
-      // First connect
-      onlineUsers.add('user-1');
-      trackUserOnline(io as any, 'user-1');
+      // Simulate user already online in Redis
+      redisStore.set('presence:user-1', '1');
+      await trackUserOnline(io as any, 'user-1');
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -130,16 +169,31 @@ describe('Presence Handlers', () => {
   // trackUserOffline
   // =========================================================================
   describe('trackUserOffline', () => {
-    it('should remove user from onlineUsers set', () => {
-      onlineUsers.add('user-1');
+    it('should remove presence key from Redis', async () => {
+      redisStore.set('presence:user-1', '1');
 
-      trackUserOffline('user-1');
+      await trackUserOffline('user-1');
 
-      expect(onlineUsers.has('user-1')).toBe(false);
+      expect(redisStore.has('presence:user-1')).toBe(false);
     });
 
-    it('should not throw when user is not in online set', () => {
-      expect(() => trackUserOffline('user-unknown')).not.toThrow();
+    it('should not throw when user is not online', async () => {
+      await expect(trackUserOffline('user-unknown')).resolves.toBeUndefined();
+    });
+  });
+
+  // =========================================================================
+  // isUserOnline
+  // =========================================================================
+  describe('isUserOnline', () => {
+    it('should return true when user presence key exists', async () => {
+      redisStore.set('presence:user-1', '1');
+
+      expect(await isUserOnline('user-1')).toBe(true);
+    });
+
+    it('should return false when user presence key does not exist', async () => {
+      expect(await isUserOnline('user-99')).toBe(false);
     });
   });
 
@@ -148,7 +202,7 @@ describe('Presence Handlers', () => {
   // =========================================================================
   describe('getOnlineFriends', () => {
     it('should return only friends that are online', async () => {
-      onlineUsers.add('user-2'); // Bob is online
+      redisStore.set('presence:user-2', '1'); // Bob is online
       // Carol (user-3) is offline
 
       const result = await getOnlineFriends('user-1');
@@ -157,8 +211,8 @@ describe('Presence Handlers', () => {
     });
 
     it('should return all friends when all are online', async () => {
-      onlineUsers.add('user-2');
-      onlineUsers.add('user-3');
+      redisStore.set('presence:user-2', '1');
+      redisStore.set('presence:user-3', '1');
 
       const result = await getOnlineFriends('user-1');
 
@@ -181,15 +235,14 @@ describe('Presence Handlers', () => {
       expect(result).toEqual([]);
     });
 
-    it('should resolve friend IDs correctly when user is on either side of the friendship', async () => {
-      // Alice is friendId in one, userId in another
+    it('should resolve friend IDs correctly when user is on either side', async () => {
       mockFriendshipFindMany.mockResolvedValue([
-        { userId: 'user-2', friendId: 'user-1' }, // Bob sent request to Alice
-        { userId: 'user-1', friendId: 'user-3' }, // Alice sent request to Carol
+        { userId: 'user-2', friendId: 'user-1' },
+        { userId: 'user-1', friendId: 'user-3' },
       ] as any);
 
-      onlineUsers.add('user-2');
-      onlineUsers.add('user-3');
+      redisStore.set('presence:user-2', '1');
+      redisStore.set('presence:user-3', '1');
 
       const result = await getOnlineFriends('user-1');
 
@@ -232,7 +285,6 @@ describe('Presence Handlers', () => {
       mockFriendshipFindMany.mockRejectedValue(new Error('DB error'));
       const io = createMockIO();
 
-      // Should not throw
       await notifyFriendsOnline(io as any, 'user-1');
     });
 

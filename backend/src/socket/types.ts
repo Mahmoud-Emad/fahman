@@ -116,6 +116,7 @@ export interface GameStartedData {
   roomId: string;
   totalQuestions: number;
   packTitle: string;
+  textHint: string | null;
 }
 
 export interface QuestionData {

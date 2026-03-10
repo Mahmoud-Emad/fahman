@@ -55,6 +55,25 @@ export interface SoundSection {
   totalSounds: number;
 }
 
+export interface StorePackQuestion {
+  number: number;
+  question: string;
+  answer: string;
+  coverUrl: string | null;
+}
+
+export interface StorePackPreview {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  coverUrl: string | null;
+  textHint: string;
+  price: number;
+  numberOfQuestions: number;
+  previewQuestions: StorePackQuestion[];
+}
+
 export interface StoreData {
   avatars: {
     free: StoreItem[];
@@ -63,6 +82,7 @@ export interface StoreData {
   };
   sounds: SoundSection[];
   ownedSounds: SoundItem[];
+  packs: StorePackPreview[];
 }
 
 // ============================================================================
@@ -91,7 +111,7 @@ function transformAlbum(album: AvatarAlbum): AvatarAlbum {
   return {
     ...album,
     previewUrl: transformUrl(album.previewUrl),
-    avatars: album.avatars.map(transformStoreItem),
+    avatars: (album.avatars || []).map(transformStoreItem),
   };
 }
 
@@ -101,9 +121,9 @@ function transformAlbum(album: AvatarAlbum): AvatarAlbum {
 function transformSoundSection(section: SoundSection): SoundSection {
   return {
     ...section,
-    subSections: section.subSections.map(sub => ({
+    subSections: (section.subSections || []).map(sub => ({
       ...sub,
-      sounds: sub.sounds.map(transformStoreItem),
+      sounds: (sub.sounds || []).map(transformStoreItem),
     })),
   };
 }
@@ -111,15 +131,31 @@ function transformSoundSection(section: SoundSection): SoundSection {
 /**
  * Transform all URLs in store data
  */
+/**
+ * Transform pack preview URLs
+ */
+function transformPackPreview(pack: StorePackPreview): StorePackPreview {
+  return {
+    ...pack,
+    coverUrl: pack.coverUrl ? transformUrl(pack.coverUrl) : null,
+    previewQuestions: (pack.previewQuestions || []).map(q => ({
+      ...q,
+      coverUrl: q.coverUrl ? transformUrl(q.coverUrl) : null,
+    })),
+  };
+}
+
 function transformStoreData(data: StoreData): StoreData {
+  const avatars = data.avatars || { free: [], albums: [], ownedAlbums: [] };
   return {
     avatars: {
-      free: data.avatars.free.map(transformStoreItem),
-      albums: data.avatars.albums.map(transformAlbum),
-      ownedAlbums: data.avatars.ownedAlbums.map(transformAlbum),
+      free: (avatars.free || []).map(transformStoreItem),
+      albums: (avatars.albums || []).map(transformAlbum),
+      ownedAlbums: (avatars.ownedAlbums || []).map(transformAlbum),
     },
-    sounds: data.sounds.map(transformSoundSection),
-    ownedSounds: data.ownedSounds.map(transformStoreItem) as SoundItem[],
+    sounds: (data.sounds || []).map(transformSoundSection),
+    ownedSounds: (data.ownedSounds || []).map(transformStoreItem) as SoundItem[],
+    packs: (data.packs || []).map(transformPackPreview),
   };
 }
 
@@ -180,7 +216,7 @@ class StoreService {
   async getStoreData(): Promise<ApiResponse<StoreData>> {
     // Fetch store data and owned items in parallel
     const [response, ownedAlbumIds, ownedSoundIds] = await Promise.all([
-      api.get<{ avatars: { free: StoreItem[]; albums: AvatarAlbum[] }; sounds: SoundSection[] }>('/store'),
+      api.get<{ avatars: { free: StoreItem[]; albums: AvatarAlbum[] }; sounds: SoundSection[]; packs: StorePackPreview[] }>('/store'),
       this.getOwnedAlbumIds(),
       this.getOwnedSoundIds(),
     ]);
@@ -194,13 +230,14 @@ class StoreService {
         },
         sounds: response.data.sounds,
         ownedSounds: [],
+        packs: response.data.packs || [],
       });
 
       // Mark albums as owned and separate them
       const ownedAlbums: AvatarAlbum[] = [];
       const availableAlbums: AvatarAlbum[] = [];
 
-      transformed.avatars.albums.forEach(album => {
+      (transformed.avatars.albums || []).forEach(album => {
         if (ownedAlbumIds.includes(album.id)) {
           ownedAlbums.push({ ...album, isOwned: true });
         } else {
@@ -211,15 +248,15 @@ class StoreService {
       // Collect owned sounds from all sections
       const ownedSounds: SoundItem[] = [];
 
-      transformed.sounds.forEach(section => {
-        section.subSections.forEach(subSection => {
-          subSection.sounds.forEach(sound => {
+      (transformed.sounds || []).forEach(section => {
+        (section.subSections || []).forEach(subSection => {
+          (subSection.sounds || []).forEach(sound => {
             if (ownedSoundIds.includes(sound.id)) {
               ownedSounds.push({ ...sound, isOwned: true });
             }
           });
           // Mark sounds as owned in place
-          subSection.sounds = subSection.sounds.map(sound => ({
+          subSection.sounds = (subSection.sounds || []).map(sound => ({
             ...sound,
             isOwned: ownedSoundIds.includes(sound.id),
           }));
@@ -234,6 +271,7 @@ class StoreService {
         },
         sounds: transformed.sounds,
         ownedSounds,
+        packs: transformed.packs,
       };
     }
 
@@ -288,6 +326,13 @@ class StoreService {
       await this.addOwnedSound(soundId);
     }
     return response;
+  }
+
+  /**
+   * Purchase a pack
+   */
+  async purchasePack(packId: string): Promise<ApiResponse<{ packId: string; purchased: boolean }>> {
+    return api.post<{ packId: string; purchased: boolean }>(`/store/purchase/pack/${packId}`);
   }
 
   /**

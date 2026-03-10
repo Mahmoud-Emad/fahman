@@ -10,6 +10,8 @@ import type { Conversation, DirectMessage } from "@/components/messaging/types";
 import { friendsService, type FriendWithStatus, type FriendRequest as ApiFriendRequest } from "@/services/friendsService";
 import { socketService } from "@/services/socketService";
 import { transformUrl } from "@/utils/transformUrl";
+import { UI_TIMING } from "@/constants";
+import { useToast } from "@/contexts";
 import type { RootStackParamList } from "../../App";
 
 export interface UseFriendsReturn {
@@ -121,6 +123,7 @@ function getInitials(name: string): string {
  */
 export function useFriends(): UseFriendsReturn {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const toast = useToast();
 
   // Friends state
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -167,8 +170,9 @@ export function useFriends(): UseFriendsReturn {
         setSentRequests(sentRes.data.map(transformFriendRequest));
       }
     } catch (err: any) {
-      setError(err.message || "Failed to fetch friends");
-      console.error("Error fetching friends:", err);
+      const message = err.message || "Failed to fetch friends";
+      setError(message);
+      toast.error(message);
     }
   }, [onlineFriendIds]);
 
@@ -197,7 +201,7 @@ export function useFriends(): UseFriendsReturn {
       isOpeningRef.current = false;
       // Request friend statuses from socket
       socketService.requestFriendStatuses();
-    }, 300);
+    }, UI_TIMING.MODAL_TRANSITION_DELAY);
   }, [fetchFriends, friendsListVisible]);
 
   // Setup socket listeners for friend online status
@@ -261,20 +265,20 @@ export function useFriends(): UseFriendsReturn {
           if (res.success && res.data) {
             setFriendRequests(res.data.map(transformFriendRequest));
           }
-        });
+        }).catch(() => {});
       } else if (data.type === "FRIEND_ACCEPTED") {
         // Refresh friends list to include the new friend
         friendsService.getFriends().then((res) => {
           if (res.success && res.data) {
             setFriends(res.data.map((f) => transformFriend(f, onlineFriendIds)));
           }
-        });
+        }).catch(() => {});
         // Remove from sent requests
         friendsService.getSentRequests().then((res) => {
           if (res.success && res.data) {
             setSentRequests(res.data.map(transformFriendRequest));
           }
-        });
+        }).catch(() => {});
       }
     });
     return unsub;
@@ -298,7 +302,7 @@ export function useFriends(): UseFriendsReturn {
     setFriendsListVisibleWrapper(false);
     setTimeout(() => {
       navigation.navigate("UserProfile", { userId: friend.id });
-    }, 300);
+    }, UI_TIMING.MODAL_TRANSITION_DELAY);
   }, [setFriendsListVisibleWrapper, navigation]);
 
   // Handle message friend - close friends list and set pending chat friend
@@ -316,7 +320,7 @@ export function useFriends(): UseFriendsReturn {
   // Handle invite friend to game - close friends list, then open create game dialog
   const handleInviteFriend = useCallback((friend: Friend) => {
     setFriendsListVisibleWrapper(false);
-    setTimeout(() => setPlayFriend(friend), 300);
+    setTimeout(() => setPlayFriend(friend), UI_TIMING.MODAL_TRANSITION_DELAY);
   }, [setFriendsListVisibleWrapper]);
 
   // Handle accept friend request
@@ -338,8 +342,9 @@ export function useFriends(): UseFriendsReturn {
         setFriendRequests((prev) => prev.filter((r) => r.id !== request.id));
       }
     } catch (err: any) {
-      console.error("Error accepting friend request:", err);
-      setError(err.message || "Failed to accept friend request");
+      const message = err.message || "Failed to accept friend request";
+      setError(message);
+      toast.error(message);
     }
   }, []);
 
@@ -351,8 +356,9 @@ export function useFriends(): UseFriendsReturn {
         setFriendRequests((prev) => prev.filter((r) => r.id !== request.id));
       }
     } catch (err: any) {
-      console.error("Error declining friend request:", err);
-      setError(err.message || "Failed to decline friend request");
+      const message = err.message || "Failed to decline friend request";
+      setError(message);
+      toast.error(message);
     }
   }, []);
 
@@ -364,8 +370,9 @@ export function useFriends(): UseFriendsReturn {
         setSentRequests((prev) => prev.filter((r) => r.id !== request.id));
       }
     } catch (err: any) {
-      console.error("Error canceling friend request:", err);
-      setError(err.message || "Failed to cancel friend request");
+      const message = err.message || "Failed to cancel friend request";
+      setError(message);
+      toast.error(message);
     }
   }, []);
 
@@ -388,7 +395,7 @@ export function useFriends(): UseFriendsReturn {
       if (res.success && res.data) {
         setSentRequests(res.data.map(transformFriendRequest));
       }
-    });
+    }).catch(() => {});
   }, []);
 
   return {

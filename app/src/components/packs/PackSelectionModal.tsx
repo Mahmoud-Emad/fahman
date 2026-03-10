@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Button } from "@/components/ui";
-import { colors } from "@/themes";
+import { colors, withOpacity } from "@/themes";
 import { MODAL_SIZES } from "@/constants";
 import { PackSection } from "./PackSection";
 import type { PackData, PackSectionData } from "./types";
@@ -147,7 +147,7 @@ export function PackSelectionModal({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
+            backgroundColor: withOpacity(colors.black, 0.5),
             opacity: fadeAnim,
           }}
         >

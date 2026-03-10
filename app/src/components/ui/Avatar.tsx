@@ -17,8 +17,8 @@ export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
  * Props for the Avatar component
  */
 export interface AvatarProps {
-  /** Image source */
-  source?: ImageSourcePropType;
+  /** Image source (URI string or ImageSourcePropType) */
+  source?: ImageSourcePropType | string;
   /** Image URI string (alternative to source) */
   uri?: string;
   /** Fallback initials (displayed when no image) */

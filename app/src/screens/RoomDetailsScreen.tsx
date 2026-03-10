@@ -157,6 +157,7 @@ export function RoomDetailsScreen() {
     setWinner: gameState.setWinner,
     setFinalScores: gameState.setFinalScores,
     setMessages: gameState.setMessages,
+    setTextHint: gameState.setTextHint,
   });
 
   // REST fallback — if still in "waiting" phase after 3s, fetch game state from API
@@ -222,7 +223,7 @@ export function RoomDetailsScreen() {
   }, [navigation]);
 
   const { gamePhase, hasSubmitted, isHost, selectedAnswer, selectedBet } = gameState;
-  const canSubmit = selectedAnswer !== null && selectedBet !== null && !hasSubmitted;
+  const canSubmit = selectedAnswer.trim().length > 0 && selectedBet !== null && !hasSubmitted;
 
   return (
     <KeyboardAvoidingView
@@ -249,9 +250,8 @@ export function RoomDetailsScreen() {
           <AnsweringPhase
             timeLeft={gameState.timeLeft}
             questionText={gameState.questionText}
-            options={gameState.options}
-            selectedAnswer={gameState.selectedAnswer}
-            onSelectOption={gameState.setSelectedAnswer}
+            answerText={gameState.selectedAnswer}
+            onChangeAnswer={gameState.setSelectedAnswer}
             hasSubmitted={hasSubmitted}
             selectedBet={gameState.selectedBet}
             onBetSelect={gameState.setSelectedBet}
@@ -259,6 +259,7 @@ export function RoomDetailsScreen() {
             usedBets={gameState.usedBets}
             playersAnsweredCount={gameState.playersAnswered.length}
             totalPlayers={gameState.totalPlayers}
+            textHint={gameState.textHint}
           />
         )}
 
@@ -268,8 +269,6 @@ export function RoomDetailsScreen() {
             currentQuestion={gameState.currentQuestion}
             totalQuestions={gameState.totalQuestions}
             questionText={gameState.questionText}
-            options={gameState.options}
-            correctAnswer={gameState.correctAnswer}
             questionResults={gameState.questionResults}
             isHost={isHost}
             onNextQuestion={handlers.handleNextQuestion}

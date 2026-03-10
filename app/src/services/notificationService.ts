@@ -19,7 +19,7 @@ export interface Notification {
     displayName: string | null;
     avatar: string | null;
   };
-  actionData: any | null;
+  actionData: Record<string, unknown> | null;
   isRead: boolean;
   createdAt: string;
 }

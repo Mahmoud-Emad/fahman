@@ -7,17 +7,18 @@ import { View, Pressable, Animated, Dimensions, Modal as RNModal } from "react-n
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon, Button } from "@/components/ui";
 import { BuyCoinsModal } from "@/components/common";
-import { storeService, type StoreData, type AvatarAlbum, type StoreItem, type SoundItem } from "@/services/storeService";
+import { storeService, type StoreData, type AvatarAlbum, type StoreItem, type SoundItem, type StorePackPreview } from "@/services/storeService";
 import { colors, withOpacity } from "@/themes";
 import { MODAL_SIZES } from "@/constants";
 import { useToast } from "@/contexts";
 import { AvatarsTab } from "./AvatarShopTab";
 import { SoundsTab, SoundPreviewModal } from "./SoundShopTab";
+import { PacksTab, PackPreviewModal } from "./PackShopTab";
 import { AvatarPreviewModal } from "./AvatarPreviewModal";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-type CategoryType = "avatars" | "sounds";
+type CategoryType = "avatars" | "sounds" | "packs";
 
 interface MarketplaceModalProps {
   visible: boolean;
@@ -53,6 +54,7 @@ export function MarketplaceModal({
   const [localAvatarUrl, setLocalAvatarUrl] = useState(currentAvatarUrl);
   const [previewAvatar, setPreviewAvatar] = useState<StoreItem | null>(null);
   const [previewSound, setPreviewSound] = useState<SoundItem | null>(null);
+  const [previewPack, setPreviewPack] = useState<StorePackPreview | null>(null);
   const [buyCoinsVisible, setBuyCoinsVisible] = useState(false);
 
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -101,6 +103,7 @@ export function MarketplaceModal({
   const handleBuyCoins = () => {
     setPreviewSound(null);
     setPreviewAvatar(null);
+    setPreviewPack(null);
     if (onBuyCoins) onBuyCoins();
     else setBuyCoinsVisible(true);
   };
@@ -144,16 +147,35 @@ export function MarketplaceModal({
     }
   };
 
+  const handlePackPurchase = async () => {
+    if (!previewPack) return;
+    if (localCoins < previewPack.price) { handleBuyCoins(); return; }
+    try {
+      const response = await storeService.purchasePack(previewPack.id);
+      if (response.success) {
+        const newBalance = localCoins - previewPack.price;
+        setLocalCoins(newBalance);
+        onCoinsUpdated?.(newBalance);
+        setPreviewPack(null);
+        toast.success("Pack purchased!");
+        fetchStoreData();
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to purchase pack");
+    }
+  };
+
   const categories: { id: CategoryType; label: string; icon: string }[] = [
     { id: "avatars", label: "Avatars", icon: "person-circle" },
     { id: "sounds", label: "Sounds", icon: "musical-notes" },
+    { id: "packs", label: "Packs", icon: "albums" },
   ];
 
   return (
     <RNModal visible={visible} transparent animationType="none" onRequestClose={handleClose} statusBarTranslucent>
       <View className="flex-1 justify-end" pointerEvents="box-none">
         {/* Backdrop */}
-        <Animated.View pointerEvents="auto" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", opacity: fadeAnim }}>
+        <Animated.View pointerEvents="auto" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: withOpacity(colors.black, 0.5), opacity: fadeAnim }}>
           <Pressable className="flex-1" onPress={handleClose} />
         </Animated.View>
 
@@ -236,6 +258,14 @@ export function MarketplaceModal({
                     onSoundPress={setPreviewSound}
                   />
                 )}
+                {activeCategory === "packs" && (
+                  <PacksTab
+                    data={storeData?.packs || null}
+                    isLoading={isLoading}
+                    userCoins={localCoins}
+                    onPackPress={setPreviewPack}
+                  />
+                )}
               </>
             )}
           </View>
@@ -267,6 +297,15 @@ export function MarketplaceModal({
         userCoins={localCoins}
         onClose={() => setPreviewSound(null)}
         onPurchase={handleSoundPurchase}
+        onBuyCoins={handleBuyCoins}
+      />
+
+      <PackPreviewModal
+        visible={!!previewPack}
+        pack={previewPack}
+        userCoins={localCoins}
+        onClose={() => setPreviewPack(null)}
+        onPurchase={handlePackPurchase}
         onBuyCoins={handleBuyCoins}
       />
 

@@ -4,7 +4,7 @@
 
 import { Server } from 'socket.io';
 import { prisma } from '../../config/database';
-import gameService from '../../services/gameService';
+import gameService from '../../modules/game/gameService';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
@@ -14,7 +14,7 @@ import {
   GameFinishedData,
   PlayerScore,
 } from '../types';
-import logger from '../../utils/logger';
+import logger from '../../shared/utils/logger';
 
 // Track active game timers
 const gameTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -49,9 +49,10 @@ export function registerGameHandlers(
       }
 
       logger.info(`${socket.username} answered in room ${roomId}: correct=${result.isCorrect}`);
-    } catch (error: any) {
-      logger.error(`Error submitting answer: ${error.message}`);
-      socket.emit('error', { message: error.message || 'Failed to submit answer' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to submit answer';
+      logger.error(`Error submitting answer: ${msg}`);
+      socket.emit('error', { message: msg });
     }
   });
 
@@ -103,9 +104,10 @@ export function registerGameHandlers(
       }
 
       logger.info(`Game next in room ${roomId}: finished=${result.finished}`);
-    } catch (error: any) {
-      logger.error(`Error moving to next question: ${error.message}`);
-      socket.emit('error', { message: error.message || 'Failed to move to next question' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to move to next question';
+      logger.error(`Error moving to next question: ${msg}`);
+      socket.emit('error', { message: msg });
     }
   });
 }
@@ -135,6 +137,7 @@ export async function broadcastGameStarted(
     roomId,
     totalQuestions: room.selectedPack.questions.length,
     packTitle: room.selectedPack.title,
+    textHint: room.selectedPack.textHint || null,
   });
 
   // Send first question

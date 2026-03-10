@@ -1,10 +1,11 @@
 /**
- * AnsweringPhase - Multiple-choice question UI with timer and bet selection
+ * AnsweringPhase - Free-text answer input with timer and bet selection.
+ * Players type their answer; the host corrects answers manually.
  */
 import React from "react";
-import { View, Pressable } from "react-native";
-import { Text, Icon } from "@/components/ui";
-import { colors, withOpacity } from "@/themes";
+import { View } from "react-native";
+import { Text, Icon, Input } from "@/components/ui";
+import { colors } from "@/themes";
 import { TimerDisplay, BetCard } from "../GameComponents";
 
 interface AnsweringPhaseProps {
@@ -12,12 +13,10 @@ interface AnsweringPhaseProps {
   timeLeft: number;
   /** Current question text */
   questionText: string;
-  /** Multiple-choice options from server */
-  options: string[];
-  /** Index of currently selected option (null if none) */
-  selectedAnswer: number | null;
-  /** Callback when an option is selected */
-  onSelectOption: (index: number) => void;
+  /** Current typed answer text */
+  answerText: string;
+  /** Callback when the user types an answer */
+  onChangeAnswer: (text: string) => void;
   /** Whether answer has been submitted */
   hasSubmitted: boolean;
   /** Currently selected bet value */
@@ -32,19 +31,19 @@ interface AnsweringPhaseProps {
   playersAnsweredCount: number;
   /** Total players in the game */
   totalPlayers: number;
+  /** Pack hint text displayed under the question */
+  textHint?: string | null;
 }
 
-const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
-
 /**
- * Answering phase component - shows multiple-choice options instead of free text
+ * Answering phase component - shows a text input for free-text answers.
+ * Answer options are never displayed; the host grades answers after submission.
  */
 export function AnsweringPhase({
   timeLeft,
   questionText,
-  options,
-  selectedAnswer,
-  onSelectOption,
+  answerText,
+  onChangeAnswer,
   hasSubmitted,
   selectedBet,
   onBetSelect,
@@ -52,6 +51,7 @@ export function AnsweringPhase({
   usedBets,
   playersAnsweredCount,
   totalPlayers,
+  textHint,
 }: AnsweringPhaseProps) {
   return (
     <>
@@ -70,9 +70,21 @@ export function AnsweringPhase({
         <Text variant="h2" className="font-bold text-center">
           {questionText}
         </Text>
+        {textHint ? (
+          <View className="mt-3 flex-row items-center justify-center">
+            <Icon name="bulb-outline" customSize={14} color={colors.primary[500]} />
+            <Text
+              variant="body-sm"
+              className="ml-1.5 text-center"
+              style={{ color: colors.primary[500] }}
+            >
+              {textHint}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      {/* Multiple Choice Options */}
+      {/* Answer Input */}
       {hasSubmitted ? (
         <View className="mb-6 items-center py-6">
           <Icon name="checkmark-circle" size="xl" color={colors.success} />
@@ -86,59 +98,17 @@ export function AnsweringPhase({
       ) : (
         <View className="mb-6">
           <Text variant="body" className="font-semibold mb-3">
-            Choose your answer
+            Type your answer
           </Text>
-          {options.map((option, index) => {
-            const isSelected = selectedAnswer === index;
-            return (
-              <Pressable
-                key={index}
-                onPress={() => onSelectOption(index)}
-                delayPressIn={0}
-                className="rounded-xl mb-3 p-4 flex-row items-center active:scale-[0.98]"
-                style={{
-                  backgroundColor: isSelected
-                    ? withOpacity(colors.primary[500], 0.1)
-                    : colors.neutral[50],
-                  borderWidth: 2,
-                  borderColor: isSelected
-                    ? colors.primary[500]
-                    : colors.neutral[200],
-                }}
-              >
-                <View
-                  className="w-9 h-9 rounded-full items-center justify-center mr-3"
-                  style={{
-                    backgroundColor: isSelected
-                      ? colors.primary[500]
-                      : colors.neutral[200],
-                  }}
-                >
-                  <Text
-                    variant="body"
-                    className="font-bold"
-                    style={{
-                      color: isSelected ? colors.white : colors.text.primary,
-                    }}
-                  >
-                    {OPTION_LETTERS[index] ?? String(index + 1)}
-                  </Text>
-                </View>
-                <Text
-                  variant="body"
-                  className="flex-1 font-medium"
-                  style={{
-                    color: isSelected ? colors.primary[500] : colors.text.primary,
-                  }}
-                >
-                  {option}
-                </Text>
-                {isSelected && (
-                  <Icon name="checkmark-circle" size="md" color={colors.primary[500]} />
-                )}
-              </Pressable>
-            );
-          })}
+          <Input
+            variant="filled"
+            placeholder="Enter your answer..."
+            value={answerText}
+            onChangeText={onChangeAnswer}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+          />
         </View>
       )}
 

@@ -18,7 +18,7 @@ interface UseGameHandlersOptions {
   roomId: string;
 
   // State values
-  selectedAnswer: number | null;
+  selectedAnswer: string;
   selectedBet: number | null;
   hasSubmitted: boolean;
   timeLeft: number;
@@ -68,9 +68,9 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
 
   // Handle answer submission — emit to server
   const handleSubmitAnswer = useCallback(() => {
-    if (selectedAnswer === null || selectedBet === null || hasSubmitted) return;
+    if (!selectedAnswer.trim() || selectedBet === null || hasSubmitted) return;
 
-    socketService.submitAnswer(roomId, selectedAnswer, selectedBet, timeLeft);
+    socketService.submitAnswer(roomId, selectedAnswer.trim(), selectedBet, timeLeft);
     setHasSubmitted(true);
 
     // Track used bet

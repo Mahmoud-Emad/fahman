@@ -149,6 +149,7 @@ model User {
   notifications     Notification[] @relation("UserNotifications")
   sentNotifications Notification[] @relation("SentNotifications")
   settings          UserSettings?  @relation("UserSettings")
+  achievements      UserAchievement[]
 
   @@unique([authProvider, providerId]) // Prevent duplicate OAuth accounts
   @@index([email])
@@ -182,6 +183,7 @@ model Pack {
   creatorId   String      @map("creator_id")
   title       String      @db.VarChar(200)
   description String?     @db.Text
+  textHint    String?     @map("text_hint") @db.VarChar(500)
   imageUrl    String?     @map("image_url") @db.VarChar(500)
   isStandard  Boolean     @default(false) @map("is_standard")
   visibility  Visibility  @default(PUBLIC)
@@ -407,6 +409,43 @@ model Notification {
   @@index([userId, isRead])
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  slug        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String   @db.Text
+  logo        String?  @db.VarChar(500)
+  category    String   @default("general") @db.VarChar(50)
+  sortOrder   Int      @default(0) @map("sort_order")
+  conditions  Json
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  userAchievements UserAchievement[]
+
+  @@index([category])
+  @@index([sortOrder])
+  @@map("achievements")
+}
+
+model UserAchievement {
+  userId        String   @map("user_id")
+  achievementId String   @map("achievement_id")
+  achievedAt    DateTime @default(now()) @map("achieved_at") @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+  @@index([achievedAt])
+  @@map("user_achievements")
 }
 
 model UserSettings {

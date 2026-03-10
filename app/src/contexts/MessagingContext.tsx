@@ -549,7 +549,7 @@ export function MessagingProvider({
           );
         }, UI_TIMING.MODAL_TRANSITION_DELAY);
       } else if (notification.type === "friend_request") {
-        const friendshipId = notification.actionData?.friendshipId;
+        const friendshipId = notification.actionData?.type === "friend_request" ? notification.actionData.friendshipId : undefined;
         const actionTakenValue = action === "accept" ? "accepted" : "declined";
 
         // Optimistically update actionTaken
@@ -583,7 +583,7 @@ export function MessagingProvider({
 
         if (!friendshipId) {
           const senderId =
-            notification.actionData?.senderId || notification.sender?.id;
+            (notification.actionData?.type === "friend_request" ? notification.actionData.senderId : undefined) || notification.sender?.id;
           if (!senderId) {
             toast.error("Unable to process this request");
             setNotifications((prev) =>

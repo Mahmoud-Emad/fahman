@@ -7,8 +7,8 @@ import { Text, Icon } from "@/components/ui";
 import { StatCard } from "./StatCard";
 import { colors, withOpacity } from "@/themes";
 
-/** Blue used for the "Friends" stat card — no direct theme equivalent */
-const STAT_COLOR_FRIENDS = "#3B82F6";
+/** Blue used for the "Friends" stat card */
+const STAT_COLOR_FRIENDS = colors.accent.blue;
 
 interface ProfileStatsSectionProps {
   gameId: number;

@@ -34,12 +34,13 @@ export interface RecentGame {
 
 export interface Achievement {
   id: string;
-  title: string;
+  slug: string;
+  name: string;
   description: string;
-  icon: string;
-  unlockedAt?: string;
-  progress?: number;
-  total?: number;
+  logo: string | null;
+  category: string;
+  unlocked: boolean;
+  achievedAt: string | null;
 }
 
 export interface PublicUserProfile {

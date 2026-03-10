@@ -10,12 +10,15 @@ import type { StackNavigationProp } from "@react-navigation/stack";
 import type { RootStackParamList } from "../../App";
 import { Text, Icon, Skeleton, Divider } from "@/components/ui";
 import { BottomNavBar } from "@/components/navigation";
+import { NotificationsModal, ChatsListModal, ChatDetailsModal } from "@/components/messaging";
+import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
 import { ActionRow } from "@/components/settings";
 import { SoundsSection, PrivacySection, LanguageSection } from "@/components/settings/SettingsSections";
 import { colors } from "@/themes";
 import { settingsService, type UserSettings } from "@/services/settingsService";
+import { api } from "@/services/api";
 import { useAuth, useToast, useMessaging } from "@/contexts";
-import { SOCKET_URL } from "@/config/env";
+import { useMessaging as useMessagingHook, useFriends } from "@/hooks";
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -28,6 +31,8 @@ export function SettingsScreen() {
   const { logout, user } = useAuth();
   const toast = useToast();
   const { unreadNotificationCount, unreadMessageCount } = useMessaging();
+  const messaging = useMessagingHook();
+  const friendsHook = useFriends();
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -72,12 +77,11 @@ export function SettingsScreen() {
 
   const loadVersion = async () => {
     try {
-      const response = await fetch(`${SOCKET_URL}/health`);
-      const data = await response.json();
-      if (data.version) {
-        setAppVersion(data.version);
+      const health = await api.checkHealth();
+      if (health.version) {
+        setAppVersion(health.version);
       }
-    } catch (error) {
+    } catch {
       // Version fetch failure is non-critical, fail silently
     }
   };
@@ -195,12 +199,15 @@ export function SettingsScreen() {
     );
   };
 
-  // Bottom nav — navigate to screens that already host the modals
   const handleTabPress = (tabId: string) => {
     if (tabId === "home") {
       navigation.navigate("Home" as never);
-    } else if (tabId === "friends" || tabId === "chats" || tabId === "notifications") {
-      navigation.navigate("Home" as never);
+    } else if (tabId === "friends") {
+      friendsHook.openFriendsList();
+    } else if (tabId === "chats") {
+      messaging.openChatsList();
+    } else if (tabId === "notifications") {
+      messaging.openNotifications();
     } else if (tabId === "profile") {
       navigation.navigate("Profile");
     }
@@ -398,6 +405,14 @@ export function SettingsScreen() {
           chats: unreadMessageCount,
         }}
       />
+
+      {/* Modals */}
+      <NotificationsModal visible={messaging.notificationsVisible} onClose={() => messaging.setNotificationsVisible(false)} notifications={messaging.notifications} onNotificationPress={messaging.handleNotificationPress} onNotificationAction={messaging.handleNotificationAction} onMarkAllRead={messaging.handleMarkAllNotificationsRead} onDelete={messaging.handleDeleteNotification} onClearAll={messaging.handleClearReadNotifications} isLoading={messaging.notificationsLoading} />
+      <ChatsListModal visible={messaging.chatsListVisible} onClose={() => messaging.setChatsListVisible(false)} conversations={messaging.conversations} onConversationPress={messaging.handleConversationPress} isLoading={messaging.chatsLoading} />
+      <ChatDetailsModal visible={messaging.chatDetailsVisible} onClose={() => messaging.setChatDetailsVisible(false)} conversation={messaging.activeConversation} messages={messaging.activeMessages} onSendMessage={messaging.handleSendDirectMessage} onDeleteMessage={messaging.handleDeleteMessage} onJoinRoom={messaging.handleJoinRoomFromChat} currentUserId={messaging.currentUserId} onBack={messaging.handleChatDetailsBack} />
+      <FriendsListModal visible={friendsHook.friendsListVisible} onClose={() => friendsHook.setFriendsListVisible(false)} friends={friendsHook.friends} friendRequests={friendsHook.friendRequests} sentRequests={friendsHook.sentRequests} onFriendPress={friendsHook.handleFriendPress} onMessageFriend={friendsHook.handleMessageFriend} onInviteFriend={friendsHook.handleInviteFriend} onAcceptRequest={friendsHook.handleAcceptFriendRequest} onDeclineRequest={friendsHook.handleDeclineFriendRequest} onCancelRequest={friendsHook.handleCancelFriendRequest} onAddFriend={friendsHook.handleAddFriend} isLoading={friendsHook.friendsLoading} />
+      <AddFriendModal visible={friendsHook.addFriendVisible} onClose={() => friendsHook.setAddFriendVisible(false)} onCloseAll={friendsHook.closeAllModals} onFriendAdded={friendsHook.handleFriendAdded} />
+      <CreateGameDialog visible={!!friendsHook.playFriend} friend={friendsHook.playFriend} onClose={() => friendsHook.setPlayFriend(null)} />
     </View>
   );
 }

@@ -7,6 +7,7 @@ import {
   View,
   TextInput,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { cn } from "@/utils/cn";
@@ -68,7 +69,7 @@ export interface InputProps extends Omit<TextInputProps, "style"> {
   /** Custom style object for container */
   containerStyle?: ViewStyle;
   /** Custom style object for input */
-  style?: ViewStyle;
+  style?: TextStyle;
 }
 
 /**

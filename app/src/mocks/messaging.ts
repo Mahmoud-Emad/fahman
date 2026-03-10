@@ -41,7 +41,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 min ago
     isRead: false,
     sender: { id: "u2", name: "Sara Ali", initials: "SA" },
-    actionData: { type: "friend_request", userId: "u2" },
+    actionData: { type: "friend_request", senderId: "u2", senderName: "Sara Ali", friendshipId: "fr1" },
   },
   {
     id: "n3",
@@ -100,6 +100,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
 export const MOCK_CONVERSATIONS: Conversation[] = [
   {
     id: "conv1",
+    otherId: "u1",
     participants: [
       { id: "u1", name: "Ahmed Hassan", initials: "AH", isOnline: true },
     ],
@@ -112,6 +113,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   },
   {
     id: "conv2",
+    otherId: "u2",
     participants: [
       { id: "u2", name: "Sara Ali", initials: "SA", isOnline: true },
     ],
@@ -124,6 +126,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   },
   {
     id: "conv3",
+    otherId: "u3",
     participants: [
       { id: "u3", name: "Omar Khaled", initials: "OK", isOnline: false },
     ],
@@ -136,6 +139,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   },
   {
     id: "conv4",
+    otherId: "u4",
     participants: [
       { id: "u4", name: "Fatima Noor", initials: "FN", isOnline: false },
     ],
@@ -148,6 +152,7 @@ export const MOCK_CONVERSATIONS: Conversation[] = [
   },
   {
     id: "conv5",
+    otherId: "u5",
     participants: [
       { id: "u5", name: "Youssef Mahmoud", initials: "YM", isOnline: true },
     ],

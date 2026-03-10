@@ -298,6 +298,19 @@ const handleOpenSecondModal = () => {
 };
 ```
 
+## Game Answer Model
+
+**Free-text answers only — no multiple choice.**
+
+During gameplay, players see only the question text and a text input. Answer options are **never** displayed to the player. The host manually reviews and grades each player's typed answer after submission.
+
+- `AnsweringPhase` renders an `Input` component — never selection buttons or option lists
+- `selectedAnswer` is a `string` (the typed text), not an index
+- The socket emits the raw text answer to the server via `game:answer`
+- The host uses `HostControls` to mark each player's answer as correct or incorrect
+
+**Do not** add multiple-choice option rendering, radio buttons, or selectable answer lists to the game question screen.
+
 ## Game Constants
 
 Import game configuration from constants:

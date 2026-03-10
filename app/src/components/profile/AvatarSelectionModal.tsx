@@ -17,7 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon } from "@/components/ui";
 import { avatarService, type AvatarImage, type AvatarAlbum } from "@/services/avatarService";
 import { storeService, type AvatarAlbum as StoreAlbum } from "@/services/storeService";
-import { colors } from "@/themes";
+import { colors, withOpacity } from "@/themes";
+import { UI_TIMING } from "@/constants";
 import { useToast } from "@/contexts";
 import { AvatarGridItem } from "./AvatarGrid";
 import { CollectionAlbumCard, ShopAlbumCard, AvatarEmptyState } from "./AvatarAlbumSection";
@@ -112,7 +113,7 @@ export function AvatarSelectionModal({
   const handleConfirm = () => {
     if (selectedUrl && selectedUrl !== currentAvatar) {
       handleClose();
-      setTimeout(() => onSelect(selectedUrl), 300);
+      setTimeout(() => onSelect(selectedUrl), UI_TIMING.MODAL_TRANSITION_DELAY);
     }
   };
 
@@ -152,7 +153,7 @@ export function AvatarSelectionModal({
           style={{
             position: "absolute",
             top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
+            backgroundColor: withOpacity(colors.black, 0.6),
             opacity: fadeAnim,
           }}
         >

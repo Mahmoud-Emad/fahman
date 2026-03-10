@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "./Avatar";
 import { Text } from "./Text";
 import { Icon } from "./Icon";
+import { colors } from "@/themes";
 
 export interface InAppNotificationBannerProps {
   visible: boolean;
@@ -102,7 +103,7 @@ export function InAppNotificationBanner({
         <View
           className="flex-row items-center bg-white rounded-xl px-3 py-3 border border-neutral-200"
           style={{
-            shadowColor: "#000",
+            shadowColor: colors.black,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.12,
             shadowRadius: 8,
@@ -122,7 +123,7 @@ export function InAppNotificationBanner({
               {message}
             </Text>
           </View>
-          <Icon name="close" size="sm" className="text-text-muted" />
+          <Icon name="close" size="sm" color={colors.text.muted} />
         </View>
       </Pressable>
     </Animated.View>

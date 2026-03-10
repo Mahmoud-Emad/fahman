@@ -24,7 +24,7 @@ export function PhoneManagementModal({
   phoneVerified,
   onPhoneUpdated,
 }: PhoneManagementModalProps) {
-  const { updatePhoneNumber, verifyUserPhone } = useAuth();
+  const { updatePhoneNumber, verifyUserPhone, removePhoneNumber } = useAuth();
 
   const [step, setStep] = useState<Step>("input");
   const [phone, setPhone] = useState("");
@@ -135,8 +135,18 @@ export function PhoneManagementModal({
         {
           text: "Remove",
           style: "destructive",
-          onPress: () => {
-            Alert.alert("Coming Soon", "Phone removal will be available in a future update");
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await removePhoneNumber();
+              onPhoneUpdated();
+              Alert.alert("Success", "Phone number removed successfully");
+              onClose();
+            } catch (err: any) {
+              setError(err.message || "Failed to remove phone number");
+            } finally {
+              setLoading(false);
+            }
           },
         },
       ]

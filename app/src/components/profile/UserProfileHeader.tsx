@@ -26,7 +26,7 @@ export interface DisplayData {
     currentStreak: number;
     bestStreak: number;
   };
-  achievements: { id: string; name: string; icon: any; color: string; earned: boolean }[];
+  achievements: { id: string; name: string; icon: string; color: string; earned: boolean }[];
   recentGames: { id: string; packName: string; result: string; score: number; date: string }[];
 }
 

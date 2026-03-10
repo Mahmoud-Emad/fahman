@@ -56,19 +56,6 @@ export const UI_TIMING = {
 } as const;
 
 /**
- * Mock data loading delays (in milliseconds)
- * These simulate network latency during development
- */
-export const MOCK_DELAYS = {
-  /** Initial data load delay */
-  INITIAL_LOAD: 1500,
-  /** Refresh data delay */
-  REFRESH: 1000,
-  /** Load more (pagination) delay */
-  LOAD_MORE: 1000,
-} as const;
-
-/**
  * Pagination configuration
  */
 export const PAGINATION = {
@@ -152,8 +139,12 @@ export const MODAL_SIZES = {
  * Room configuration limits
  */
 export const ROOM_LIMITS = {
+  /** Minimum room title length */
+  TITLE_MIN_LENGTH: 3,
   /** Maximum room title length */
   TITLE_MAX_LENGTH: 50,
+  /** Minimum room password length */
+  PASSWORD_MIN_LENGTH: 4,
   /** Maximum room description length */
   DESCRIPTION_MAX_LENGTH: 200,
   /** Minimum players per room */

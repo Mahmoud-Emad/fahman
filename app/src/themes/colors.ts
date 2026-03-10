@@ -74,6 +74,23 @@ export const colors = {
     bronze: { bg: "#CD7F32", border: "#8B4513", text: "#ffffff" },
   },
 
+  // Accent colors for UI variety (room cards, stat cards, etc.)
+  accent: {
+    blue: "#3B82F6",
+    violet: "#8B5CF6",
+    pink: "#EC4899",
+    emerald: "#10B981",
+    amber: "#F59E0B",
+  },
+
+  // Confetti celebration palette
+  confetti: {
+    coral: "#FF6B6B",
+    teal: "#4ECDC4",
+    purple: "#A855F7",
+    blue: "#3B82F6",
+  },
+
   // Brand colors for social login buttons
   brands: {
     google: "#EA4335",

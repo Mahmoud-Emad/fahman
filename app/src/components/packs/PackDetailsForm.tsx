@@ -15,6 +15,7 @@ interface PackDetailsFormProps {
   onRemoveLogo: () => void;
   onUpdateTitle: (title: string) => void;
   onUpdateDescription: (description: string) => void;
+  onUpdateTextHint: (textHint: string) => void;
   onTogglePublic: () => void;
 }
 
@@ -28,6 +29,7 @@ export function PackDetailsForm({
   onRemoveLogo,
   onUpdateTitle,
   onUpdateDescription,
+  onUpdateTextHint,
   onTogglePublic,
 }: PackDetailsFormProps) {
   return (
@@ -103,6 +105,21 @@ export function PackDetailsForm({
           maxLength={PACK_LIMITS.DESCRIPTION_MAX_LENGTH}
           style={{ minHeight: 60 }}
         />
+      </View>
+
+      {/* Hint */}
+      <View className="mb-4">
+        <Input
+          label="Hint for players"
+          placeholder="e.g. Type the movie name this quote is from"
+          value={formData.textHint}
+          onChangeText={onUpdateTextHint}
+          maxLength={500}
+          style={{ minHeight: 44 }}
+        />
+        <Text variant="caption" color="muted" className="mt-1">
+          This hint appears under each question during gameplay to guide players
+        </Text>
       </View>
 
       {/* Public Toggle */}

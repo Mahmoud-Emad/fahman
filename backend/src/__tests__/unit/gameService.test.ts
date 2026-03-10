@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock, spyOn } from 'bun:test';
-import { GameService } from '../../services/gameService';
+import { GameService } from '../../modules/game/gameService';
 import {
   testUsers,
   testRooms,

@@ -14,6 +14,7 @@ import { ROOM_LIMITS } from "@/constants";
 import { usePacks } from "@/hooks";
 import { roomsService } from "@/services/roomsService";
 import { useToast } from "@/contexts";
+import type { ApiError } from "@/services/api";
 import type { RootStackParamList } from "../../App";
 import type { PackData, RoomConfigData, RoomConfigErrors } from "@/components/packs/types";
 
@@ -70,8 +71,11 @@ export function RoomConfigScreen() {
   const validateForm = (): boolean => {
     const newErrors: RoomConfigErrors = {};
 
-    if (!config.title.trim()) {
+    const trimmedTitle = config.title.trim();
+    if (!trimmedTitle) {
       newErrors.title = "Room title is required";
+    } else if (trimmedTitle.length < ROOM_LIMITS.TITLE_MIN_LENGTH) {
+      newErrors.title = `Title must be at least ${ROOM_LIMITS.TITLE_MIN_LENGTH} characters`;
     } else if (config.title.length > ROOM_LIMITS.TITLE_MAX_LENGTH) {
       newErrors.title = `Title must be ${ROOM_LIMITS.TITLE_MAX_LENGTH} characters or less`;
     }
@@ -82,6 +86,8 @@ export function RoomConfigScreen() {
 
     if (config.isPasswordProtected && !config.password.trim()) {
       newErrors.password = "Password is required when protection is enabled";
+    } else if (config.isPasswordProtected && config.password.trim().length < ROOM_LIMITS.PASSWORD_MIN_LENGTH) {
+      newErrors.password = `Password must be at least ${ROOM_LIMITS.PASSWORD_MIN_LENGTH} characters`;
     }
 
     setErrors(newErrors);
@@ -117,7 +123,36 @@ export function RoomConfigScreen() {
         room: createdRoom,
       });
     } catch (error: any) {
-      toast.error(error.message || "Failed to create room");
+      const apiError = error as ApiError;
+
+      // Map backend field validation errors to form fields
+      if (apiError.fieldErrors && Object.keys(apiError.fieldErrors).length > 0) {
+        const fieldMap: Record<string, keyof RoomConfigErrors> = {
+          title: "title",
+          description: "description",
+          maxPlayers: "maxPlayers",
+          password: "password",
+        };
+
+        const newErrors: RoomConfigErrors = {};
+        let hasFieldError = false;
+
+        for (const [field, message] of Object.entries(apiError.fieldErrors)) {
+          const formField = fieldMap[field];
+          if (formField) {
+            newErrors[formField] = message;
+            hasFieldError = true;
+          }
+        }
+
+        if (hasFieldError) {
+          setErrors(newErrors);
+        } else {
+          toast.error(apiError.message || "Failed to create room");
+        }
+      } else {
+        toast.error(apiError.message || "Failed to create room");
+      }
     } finally {
       setIsCreating(false);
     }

@@ -74,11 +74,11 @@ function AvatarStack({ users, totalUsers, maxShow = 4 }: { users: RoomUser[]; to
 /** Accent colors for room cards — provides visual variety across rooms */
 const ROOM_ACCENT_COLORS = [
   colors.primary[500],
-  "#8B5CF6", // violet
-  "#EC4899", // pink
-  "#10B981", // emerald
-  "#F59E0B", // amber
-  "#3B82F6", // blue
+  colors.accent.violet,
+  colors.accent.pink,
+  colors.accent.emerald,
+  colors.accent.amber,
+  colors.accent.blue,
 ] as const;
 
 /**
@@ -157,7 +157,7 @@ export function JoinRoomScreen() {
         // User is already a member — fetch real room data, then navigate
         toast.info("Rejoining room...");
 
-        let actualMaxPlayers = room.maxPlayers ?? 50;
+        let actualMaxPlayers = 50;
         let actualIsHost = false;
         let actualCode = roomCode || "";
 
@@ -198,7 +198,7 @@ export function JoinRoomScreen() {
             password: "",
           },
           isHost: actualIsHost,
-          room: { id: room.id, code: actualCode },
+          room: { id: room.id, code: actualCode } as any,
         });
         return;
       } else if (error.message?.includes("password") || error.message?.includes("incorrect")) {

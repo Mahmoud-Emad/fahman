@@ -28,7 +28,7 @@ interface UseGameSocketOptions {
   setOptions: (options: string[]) => void;
   setQuestionType: (type: string) => void;
   setTimeLeft: (time: number) => void;
-  setSelectedAnswer: (answer: number | null) => void;
+  setSelectedAnswer: (answer: string) => void;
   setSelectedBet: (bet: number | null) => void;
   setHasSubmitted: (submitted: boolean) => void;
   setCorrectAnswer: (answer: number[] | null) => void;
@@ -53,6 +53,7 @@ interface UseGameSocketOptions {
     rank: number;
   }[]) => void;
   setMessages: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void;
+  setTextHint: (hint: string | null) => void;
 }
 
 /**
@@ -82,6 +83,7 @@ export function useGameSocket({
   setWinner,
   setFinalScores,
   setMessages,
+  setTextHint,
 }: UseGameSocketOptions) {
   useEffect(() => {
     if (!roomId) return;
@@ -90,6 +92,7 @@ export function useGameSocket({
     const unsubStarted = socketService.onGameStarted((data: GameStartedData) => {
       if (data.roomId !== roomId) return;
       setTotalQuestions(data.totalQuestions);
+      setTextHint(data.textHint || null);
       setGamePhase("waiting");
     });
 
@@ -105,7 +108,7 @@ export function useGameSocket({
       setTimeLeft(data.question.timeLimit);
 
       // Reset per-question state
-      setSelectedAnswer(null);
+      setSelectedAnswer("");
       setSelectedBet(null);
       setHasSubmitted(false);
       setCorrectAnswer(null);

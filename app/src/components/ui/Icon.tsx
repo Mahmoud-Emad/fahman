@@ -169,7 +169,19 @@ export type IconName =
   | "arrow-down"
   | "arrow-down-outline"
   | "arrow-forward"
-  | "arrow-forward-outline";
+  | "arrow-forward-outline"
+  | "camera"
+  | "camera-outline"
+  | "chatbubble-ellipses"
+  | "chatbubble-ellipses-outline"
+  | "cloud-offline"
+  | "cloud-offline-outline"
+  | "library"
+  | "library-outline"
+  | "pricetag"
+  | "pricetag-outline"
+  | "bulb"
+  | "bulb-outline";
 
 /**
  * Icon size options

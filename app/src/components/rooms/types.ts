@@ -18,7 +18,7 @@ export interface RoomData {
   id: string;
   title: string;
   description?: string;
-  logo?: any;
+  logo?: string;
   logoInitials?: string;
   type: "public" | "private";
   users: RoomUser[];

@@ -36,6 +36,7 @@ export interface QuestionFormData {
 export interface PackFormData {
   title: string;
   description: string;
+  textHint: string;
   logoUri: string | null;
   isPublic: boolean;
   questions: QuestionFormData[];

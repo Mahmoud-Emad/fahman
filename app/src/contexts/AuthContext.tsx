@@ -54,6 +54,7 @@ interface AuthContextType extends AuthState {
   updateProfile: (data: UpdateProfileData) => Promise<void>;
   updatePhoneNumber: (data: UpdatePhoneData) => Promise<{ code?: string }>;
   verifyUserPhone: (data: VerifyUserPhoneData) => Promise<void>;
+  removePhoneNumber: () => Promise<void>;
 
   // Session management
   logout: () => Promise<void>;
@@ -352,6 +353,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const removePhoneNumber = useCallback(async () => {
+    const response = await authService.removePhoneNumber();
+    if (response.data) {
+      setState(prev => ({
+        ...prev,
+        user: response.data!,
+      }));
+    }
+  }, []);
+
   const contextValue = useMemo(
     () => ({
       ...state,
@@ -368,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       updatePhoneNumber,
       verifyUserPhone,
+      removePhoneNumber,
       logout,
       refreshUser,
       checkConnection,
@@ -389,6 +401,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       updatePhoneNumber,
       verifyUserPhone,
+      removePhoneNumber,
       logout,
       refreshUser,
       checkConnection,

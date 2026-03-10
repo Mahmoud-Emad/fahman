@@ -111,7 +111,7 @@ export function AddFriendModal({
       try {
         const response = await friendsService.sendFriendRequest(user.id);
         if (response.success) {
-          const requestId = response.data?.request?.id || response.data?.id;
+          const requestId = response.data?.id;
           setSearchResults((prev) =>
             prev.map((u) =>
               u.id === user.id

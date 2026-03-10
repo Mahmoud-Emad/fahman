@@ -10,7 +10,7 @@ import {
   ServerToClientEvents,
   RoomMemberInfo,
 } from '../types';
-import logger from '../../utils/logger';
+import logger from '../../shared/utils/logger';
 
 export function registerRoomHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -74,8 +74,8 @@ export function registerRoomHandlers(
       });
 
       logger.info(`${socket.username} joined room socket: ${roomId}`);
-    } catch (error: any) {
-      logger.error(`Error joining room socket: ${error.message}`);
+    } catch (error) {
+      logger.error(`Error joining room socket: ${error instanceof Error ? error.message : error}`);
       socket.emit('error', { message: 'Failed to join room' });
     }
   });
@@ -97,8 +97,8 @@ export function registerRoomHandlers(
       });
 
       logger.info(`${socket.username} left room socket: ${roomId}`);
-    } catch (error: any) {
-      logger.error(`Error leaving room socket: ${error.message}`);
+    } catch (error) {
+      logger.error(`Error leaving room socket: ${error instanceof Error ? error.message : error}`);
     }
   });
 
@@ -125,8 +125,8 @@ export function registerRoomHandlers(
       });
 
       logger.info(`${socket.username} set ready=${isReady} in room ${roomId}`);
-    } catch (error: any) {
-      logger.error(`Error setting ready status: ${error.message}`);
+    } catch (error) {
+      logger.error(`Error setting ready status: ${error instanceof Error ? error.message : error}`);
       socket.emit('error', { message: 'Failed to update ready status' });
     }
   });

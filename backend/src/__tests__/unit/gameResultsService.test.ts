@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { NotFoundError, ForbiddenError } from '../../utils/errors';
+import { NotFoundError, ForbiddenError } from '../../shared/utils/errors';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -104,7 +104,7 @@ mock.module('../../config/database', () => ({
 }));
 
 // Import after mocking so the module picks up the mocked prisma
-import { GameResultsService } from '../../services/gameResultsService';
+import { GameResultsService } from '../../modules/game/gameResultsService';
 
 // ---------------------------------------------------------------------------
 // Tests

@@ -9,6 +9,7 @@ export interface Pack {
   id: string;
   title: string;
   description: string | null;
+  textHint: string | null;
   imageUrl: string | null;
   category: string | null;
   difficulty: 'EASY' | 'MEDIUM' | 'HARD' | null;
@@ -56,6 +57,7 @@ export interface PackWithQuestions extends Pack {
 export interface CreatePackData {
   title: string;
   description?: string;
+  textHint?: string;
   imageUrl?: string;
   category?: string;
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD';

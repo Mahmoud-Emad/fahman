@@ -4,6 +4,7 @@
  */
 import { useState, useCallback } from "react";
 import * as ImagePicker from "expo-image-picker";
+import { useToast } from "@/contexts";
 
 interface UseImagePickerOptions {
   /** Aspect ratio for cropping [width, height] */
@@ -35,6 +36,7 @@ export function useImagePicker(
     allowsEditing = true,
   } = options;
 
+  const toast = useToast();
   const [permissionDenied, setPermissionDenied] = useState(false);
 
   const pickImage = useCallback(async (): Promise<string | null> => {
@@ -61,8 +63,8 @@ export function useImagePicker(
       }
 
       return null;
-    } catch (error) {
-      console.error("Error picking image:", error);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to pick image");
       return null;
     }
   }, [aspect, quality, allowsEditing]);

@@ -7,6 +7,8 @@ import { View, Animated, Image } from "react-native";
 import { Text, Icon } from "@/components/ui";
 import { DecoCircle } from "@/components/decorative";
 import { colors, withOpacity } from "@/themes";
+import { api } from "@/services/api";
+import { useToast } from "@/contexts";
 
 /**
  * Tips to display randomly on the welcome screen
@@ -42,12 +44,26 @@ export function WelcomeScreen({ onComplete, duration = 3000 }: WelcomeScreenProp
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const tipFadeAnim = useRef(new Animated.Value(0)).current;
   const tipSlideAnim = useRef(new Animated.Value(30)).current;
+  const { showToast } = useToast();
 
   // Select a random tip on mount
   const randomTip = useMemo(() => {
     const index = Math.floor(Math.random() * TIPS.length);
     return TIPS[index];
   }, []);
+
+  // Health check on mount — warn user if server is unreachable
+  useEffect(() => {
+    api.checkHealth().then(({ connected }) => {
+      if (!connected) {
+        showToast({
+          message: 'Unable to connect to server',
+          variant: 'error',
+          duration: 5000,
+        });
+      }
+    });
+  }, [showToast]);
 
   useEffect(() => {
     // Main content fade in animation
@@ -137,7 +153,7 @@ export function WelcomeScreen({ onComplete, duration = 3000 }: WelcomeScreenProp
             fontFamily: "sans-serif-condensed",
             color: colors.white,
             letterSpacing: 4,
-            textShadowColor: "rgba(0, 0, 0, 0.3)",
+            textShadowColor: withOpacity(colors.black, 0.3),
             textShadowOffset: { width: 2, height: 2 },
             textShadowRadius: 2,
             paddingTop: 12,

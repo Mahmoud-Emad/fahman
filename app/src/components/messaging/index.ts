@@ -26,12 +26,11 @@ export { getTimeGroup, formatMessageTime } from "./types";
 
 // Components
 export { NotificationItem } from "./NotificationItem";
-export { NotificationsModal } from "./NotificationsModal";
+export { NotificationsModal } from "@/components/lists";
 export { ConversationItem } from "./ConversationItem";
-export { ChatsListModal } from "./ChatsListModal";
+export { ChatsListModal } from "@/components/lists";
 export { MessageInput } from "./MessageInput";
 export { RoomInviteCard } from "./RoomInviteCard";
-export { DirectMessageBubble } from "./DirectMessageBubble";
 export { ChatDetailsModal } from "./ChatDetailsModal";
 
 // Skeleton components

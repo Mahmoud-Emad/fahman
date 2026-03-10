@@ -3,7 +3,7 @@
  * Modern FANG-style design with smooth collapsible header animation
  */
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { View, Pressable, Share, Animated, StyleSheet } from "react-native";
+import { View, Pressable, Share, Animated, StyleSheet, RefreshControl } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -14,7 +14,7 @@ import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components
 import {
   EditProfileModal, PhoneManagementModal, AvatarSelectionModal,
   type UserPackData, ProfileStatsSection, ProfileAchievementsSection,
-  ProfilePacksSection, ProfileGamesSection,
+  ProfilePacksSection, ProfileGamesSection, type UserRoomData,
 } from "@/components/profile";
 import { useMessaging, useFriends } from "@/hooks";
 import { useAuth, useToast } from "@/contexts";
@@ -229,6 +229,7 @@ export function ProfileScreen() {
   const [recentGames, setRecentGames] = useState<RecentGame[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollYJS = useRef(new Animated.Value(0)).current;
@@ -293,27 +294,37 @@ export function ProfileScreen() {
     fetchUserRooms();
   }, [fetchUserPacks, fetchUserRooms]));
 
+  const fetchStatsData = useCallback(async () => {
+    try {
+      const [statsResponse, gamesResponse, achievementsResponse] = await Promise.all([
+        userService.getUserStats(),
+        userService.getRecentGames(5),
+        userService.getUserAchievements(),
+      ]);
+      if (statsResponse.success && statsResponse.data) setUserStats(statsResponse.data);
+      if (gamesResponse.success && gamesResponse.data) setRecentGames(gamesResponse.data);
+      if (achievementsResponse.success && achievementsResponse.data) setAchievements(achievementsResponse.data);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load profile stats");
+    }
+  }, []);
+
   useEffect(() => {
     if (!authUser?.id) return;
-    const fetchStatsData = async () => {
-      setStatsLoading(true);
-      try {
-        const [statsResponse, gamesResponse, achievementsResponse] = await Promise.all([
-          userService.getUserStats(),
-          userService.getRecentGames(5),
-          userService.getUserAchievements(),
-        ]);
-        if (statsResponse.success && statsResponse.data) setUserStats(statsResponse.data);
-        if (gamesResponse.success && gamesResponse.data) setRecentGames(gamesResponse.data);
-        if (achievementsResponse.success && achievementsResponse.data) setAchievements(achievementsResponse.data);
-      } catch (error: any) {
-        toast.error(error.message || "Failed to load profile stats");
-      } finally {
-        setStatsLoading(false);
-      }
-    };
-    fetchStatsData();
-  }, [authUser?.id]);
+    setStatsLoading(true);
+    fetchStatsData().finally(() => setStatsLoading(false));
+  }, [authUser?.id, fetchStatsData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refreshUser(),
+      fetchUserPacks(),
+      fetchUserRooms(),
+      fetchStatsData(),
+    ]);
+    setRefreshing(false);
+  }, [refreshUser, fetchUserPacks, fetchUserRooms, fetchStatsData]);
 
   const handlePackPress = (pack: UserPackData) => navigation.navigate("PackCreation", { packId: pack.id });
   const handlePackEdit = (pack: UserPackData) => navigation.navigate("PackCreation", { packId: pack.id });
@@ -337,17 +348,16 @@ export function ProfileScreen() {
     }
   };
 
-  const handleRoomPress = (room: Room) => {
+  const handleRoomPress = (room: UserRoomData) => {
     navigation.navigate("RoomLobby", {
-      roomId: room.id, roomCode: room.code, roomTitle: room.title,
-      isHost: room.creatorId === authUser?.id,
-      pack: { id: room.selectedPackId || "", title: room.selectedPack?.title || "Unknown Pack", category: room.selectedPack?.category || "General", difficulty: room.selectedPack?.difficulty || "MEDIUM" } as any,
+      isHost: true,
+      pack: { id: room.selectedPack?.id || "", title: room.selectedPack?.title || "Unknown Pack", category: "General", difficulty: "MEDIUM" } as any,
       config: { maxPlayers: room.maxPlayers, questionsCount: 10, timerDuration: 20, maxBet: 10, isPrivate: !room.isPublic } as any,
       room: room as any,
     });
   };
 
-  const handleRoomDelete = (room: Room) => setDeleteRoomDialog({ visible: true, room });
+  const handleRoomDelete = (room: UserRoomData) => setDeleteRoomDialog({ visible: true, room: room as unknown as Room });
 
   const confirmRoomDelete = async () => {
     if (!deleteRoomDialog.room) return;
@@ -381,7 +391,7 @@ export function ProfileScreen() {
     stats: userStats
       ? { gamesPlayed: userStats.gamesPlayed, wins: userStats.wins, winRate: userStats.winRate, friends: friendsHook.friends.length, currentStreak: userStats.currentStreak, bestStreak: userStats.bestStreak }
       : { ...EMPTY_STATS, friends: friendsHook.friends.length },
-    achievements: achievements.map(a => ({ id: a.id, name: a.title, icon: a.icon as any, color: colors.gold, earned: !!a.unlockedAt })),
+    achievements: achievements.map(a => ({ id: a.id, name: a.name, icon: "trophy" as any, color: colors.gold, earned: a.unlocked })),
     recentGames: recentGames.map(g => ({ id: g.id, packName: g.packTitle, result: g.result, score: g.score, date: new Date(g.playedAt).toLocaleDateString() })),
   }), [authUser, userStats, achievements, recentGames, friendsHook.friends]);
 
@@ -491,6 +501,15 @@ export function ProfileScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingTop: topBarHeight + HEADER_EXPANDED_HEIGHT - 20 }]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary[500]}
+            colors={[colors.primary[500]]}
+            progressViewOffset={topBarHeight + HEADER_EXPANDED_HEIGHT - 20}
+          />
+        }
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
           useNativeDriver: true,
           listener: (event: any) => { scrollYJS.setValue(event.nativeEvent.contentOffset.y); },
@@ -568,5 +587,5 @@ const styles = StyleSheet.create({
   editButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: withOpacity(colors.white, 0.2), marginRight: 8 },
   shareButton: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, backgroundColor: colors.white },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
+  scrollContent: { paddingBottom: 70 },
 });

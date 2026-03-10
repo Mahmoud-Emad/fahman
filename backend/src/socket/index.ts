@@ -13,31 +13,32 @@ import {
   SocketData,
 } from './types';
 import { authenticateSocket } from './middleware';
-import { registerRoomHandlers, broadcastRoomClosed, notifyPlayerKicked } from './handlers/roomHandlers';
-import { registerGameHandlers, broadcastGameStarted, cleanupGameRoom } from './handlers/gameHandlers';
+import { registerRoomHandlers } from './handlers/roomHandlers';
+import { registerGameHandlers } from './handlers/gameHandlers';
 import { registerChatHandlers, cleanupUserTyping } from './handlers/chatHandlers';
-import { registerDmHandlers, cleanupUserDmTyping, emitDirectMessage } from './handlers/dmHandlers';
+import { registerDmHandlers, cleanupUserDmTyping } from './handlers/dmHandlers';
 import {
-  onlineUsers,
   trackUserOnline,
   trackUserOffline,
   getOnlineFriends,
   notifyFriendsOffline,
 } from './presenceHandlers';
-import logger from '../utils/logger';
+import { SocketRegistry } from './registry';
+import logger from '../shared/utils/logger';
+import { config } from '../config/env';
 
-// Store the io instance for use in other modules
-let ioInstance: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> | null = null;
+// The registry instance
+let registry: SocketRegistry | null = null;
 
 /**
- * Initialize Socket.io server
+ * Initialize Socket.io server and return the SocketRegistry
  */
-export function initializeSocket(httpServer: HttpServer): Server {
+export function initializeSocket(httpServer: HttpServer): SocketRegistry {
   const io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(
     httpServer,
     {
       cors: {
-        origin: process.env.CORS_ORIGIN || '*',
+        origin: config.cors.origin,
         methods: ['GET', 'POST'],
         credentials: true,
       },
@@ -46,8 +47,7 @@ export function initializeSocket(httpServer: HttpServer): Server {
     }
   );
 
-  // Store instance
-  ioInstance = io;
+  registry = new SocketRegistry(io);
 
   // Authentication middleware
   io.use(authenticateSocket);
@@ -77,8 +77,8 @@ export function initializeSocket(httpServer: HttpServer): Server {
       try {
         const onlineFriends = await getOnlineFriends(authSocket.userId);
         authSocket.emit('friend:statusList', { online: onlineFriends });
-      } catch (error: any) {
-        logger.error(`Error getting friend status: ${error.message}`);
+      } catch (error) {
+        logger.error(`Error getting friend status: ${error instanceof Error ? error.message : error}`);
       }
     });
 
@@ -113,118 +113,62 @@ export function initializeSocket(httpServer: HttpServer): Server {
   });
 
   logger.info('Socket.io server initialized');
-  return io;
+  return registry;
 }
 
 /**
- * Get the Socket.io instance
+ * Get the SocketRegistry instance
  */
-export function getIO(): Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> | null {
-  return ioInstance;
+export function getSocketRegistry(): SocketRegistry | null {
+  return registry;
 }
 
-/**
- * Check if user is online
- */
-export function isUserOnline(userId: string): boolean {
-  return onlineUsers.has(userId);
-}
+// ---------------------------------------------------------------------------
+// Backward-compatible facade functions
+// These delegate to the registry. They will be removed in Phase 7 when
+// controllers access the registry via req.app.get('socketRegistry').
+// ---------------------------------------------------------------------------
 
-/**
- * Send notification to a specific user via WebSocket
- */
-export function sendNotificationToUser(userId: string, notification: any): void {
-  if (!ioInstance) {
-    logger.warn('Socket.io not initialized, cannot send notification');
-    return;
+function getRegistry(): SocketRegistry {
+  if (!registry) {
+    logger.warn('Socket.io not initialized');
+    throw new Error('Socket.io not initialized');
   }
-
-  let sent = false;
-  ioInstance.sockets.sockets.forEach((socket) => {
-    const authSocket = socket as AuthenticatedSocket;
-    if (authSocket.userId === userId) {
-      authSocket.emit('notification:new', notification);
-      sent = true;
-      logger.info(`Notification sent to user ${userId}: ${notification.type}`);
-    }
-  });
-
-  if (!sent) {
-    logger.info(`User ${userId} not connected, notification not sent in real-time`);
-  }
+  return registry;
 }
 
-/**
- * Send notification update to a specific user via WebSocket
- */
+export function sendNotificationToUser(userId: string, notification: unknown): void {
+  try { getRegistry().sendNotificationToUser(userId, notification); } catch {}
+}
+
 export function sendNotificationUpdate(userId: string, data: { id: string; actionTaken: string }): void {
-  if (!ioInstance) {
-    logger.warn('Socket.io not initialized, cannot send notification update');
-    return;
-  }
-
-  ioInstance.sockets.sockets.forEach((socket) => {
-    const authSocket = socket as AuthenticatedSocket;
-    if (authSocket.userId === userId) {
-      authSocket.emit('notification:updated', data);
-    }
-  });
+  try { getRegistry().sendNotificationUpdate(userId, data); } catch {}
 }
 
-/**
- * Broadcast room closed event
- */
 export function emitRoomClosed(roomId: string, reason: string): void {
-  if (!ioInstance) return;
-  broadcastRoomClosed(ioInstance, roomId, reason);
-  cleanupGameRoom(roomId);
+  try { getRegistry().emitRoomClosed(roomId, reason); } catch {}
 }
 
-/**
- * Broadcast room list update to ALL connected sockets
- * Used to keep room list screens in sync when players join/leave/room closes
- */
 export function emitRoomListUpdate(roomId: string, currentPlayers: number, status: string): void {
-  if (!ioInstance) return;
-  ioInstance.emit('room:listUpdate', { roomId, currentPlayers, status });
+  try { getRegistry().emitRoomListUpdate(roomId, currentPlayers, status); } catch {}
 }
 
-/**
- * Emit player left event (non-host leave)
- */
 export function emitPlayerLeft(roomId: string, userId: string): void {
-  if (!ioInstance) return;
-  ioInstance.to(roomId).emit('room:playerLeft', { roomId, playerId: userId });
-  logger.info(`Emitted player left event for ${userId} in room ${roomId}`);
+  try { getRegistry().emitPlayerLeft(roomId, userId); } catch {}
 }
 
-/**
- * Emit player kicked event
- */
 export function emitPlayerKicked(roomId: string, userId: string, reason: string): void {
-  if (!ioInstance) return;
-  notifyPlayerKicked(ioInstance, roomId, userId, reason);
+  try { getRegistry().emitPlayerKicked(roomId, userId, reason); } catch {}
 }
 
-/**
- * Emit game started event
- */
 export function emitGameStarted(roomId: string): void {
-  if (!ioInstance) return;
-  broadcastGameStarted(ioInstance, roomId);
+  try { getRegistry().emitGameStarted(roomId); } catch {}
 }
 
-/**
- * Send direct message via WebSocket (from HTTP endpoint)
- */
-export function emitDmMessage(recipientId: string, message: any): void {
-  if (!ioInstance) return;
-  emitDirectMessage(ioInstance, recipientId, message);
+export function emitDmMessage(recipientId: string, message: unknown): void {
+  try { getRegistry().emitDmMessage(recipientId, message as any); } catch {}
 }
 
-/**
- * Emit player joined event (from HTTP endpoint)
- */
 export function emitPlayerJoined(roomId: string, player: {
   id: string;
   username: string;
@@ -234,43 +178,25 @@ export function emitPlayerJoined(roomId: string, player: {
   isReady: boolean;
   role: string;
 }): void {
-  if (!ioInstance) return;
-  ioInstance.to(roomId).emit('room:playerJoined', { roomId, player });
-  logger.info(`Emitted player joined event for ${player.username} in room ${roomId}`);
+  try { getRegistry().emitPlayerJoined(roomId, player); } catch {}
 }
 
-/**
- * Emit room updated event (from HTTP endpoint)
- */
-export function emitRoomUpdated(roomId: string, updates: any): void {
-  if (!ioInstance) return;
-  ioInstance.to(roomId).emit('room:updated', { roomId, updates });
+export function emitRoomUpdated(roomId: string, updates: unknown): void {
+  try { getRegistry().emitRoomUpdated(roomId, updates as any); } catch {}
 }
 
-/**
- * Emit player ready event (from HTTP endpoint)
- */
 export function emitPlayerReady(roomId: string, playerId: string, isReady: boolean): void {
-  if (!ioInstance) return;
-  ioInstance.to(roomId).emit('room:playerReady', { roomId, playerId, isReady });
+  try { getRegistry().emitPlayerReady(roomId, playerId, isReady); } catch {}
 }
 
-/**
- * Notify both users of new friendship (both online/offline status)
- */
-export function emitFriendshipAccepted(userId: string, friendId: string): void {
-  if (!ioInstance) return;
-
-  ioInstance.sockets.sockets.forEach((socket) => {
-    const authSocket = socket as AuthenticatedSocket;
-    if (authSocket.userId === friendId && isUserOnline(userId)) {
-      authSocket.emit('friend:online', { userId });
-    }
-    if (authSocket.userId === userId && isUserOnline(friendId)) {
-      authSocket.emit('friend:online', { userId: friendId });
-    }
-  });
+export async function emitFriendshipAccepted(userId: string, friendId: string): Promise<void> {
+  try { await getRegistry().emitFriendshipAccepted(userId, friendId); } catch {}
 }
 
-// Export handlers for external use
-export { broadcastRoomClosed, notifyPlayerKicked, broadcastGameStarted, cleanupGameRoom };
+export async function isUserOnline(userId: string): Promise<boolean> {
+  try { return await getRegistry().isUserOnline(userId); } catch { return false; }
+}
+
+// Re-export handler utilities for external use
+export { broadcastRoomClosed, notifyPlayerKicked } from './handlers/roomHandlers';
+export { broadcastGameStarted, cleanupGameRoom } from './handlers/gameHandlers';

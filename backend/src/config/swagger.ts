@@ -4,9 +4,7 @@
  */
 
 import swaggerJsdoc from 'swagger-jsdoc';
-
-const PORT = process.env.PORT || 3000;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+import { config } from './env';
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -26,7 +24,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: BASE_URL,
+        url: config.baseUrl,
         description: 'Development server',
       },
       {

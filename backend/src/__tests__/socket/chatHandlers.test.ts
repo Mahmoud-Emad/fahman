@@ -47,7 +47,22 @@ mock.module('../../config/database', () => ({
   },
 }));
 
-mock.module('../../utils/logger', () => ({
+// Redis mock
+const mockRedisSet = mock(() => Promise.resolve('OK'));
+const mockRedisDel = mock(() => Promise.resolve(1));
+const mockRedisKeys = mock(() => Promise.resolve([]));
+
+mock.module('../../config/redis', () => ({
+  getRedis: () => ({
+    set: mockRedisSet,
+    del: mockRedisDel,
+    keys: mockRedisKeys,
+  }),
+  connectRedis: () => Promise.resolve({}),
+  disconnectRedis: () => Promise.resolve(),
+}));
+
+mock.module('../../shared/utils/logger', () => ({
   default: {
     info: () => {},
     error: () => {},
@@ -246,8 +261,8 @@ describe('Chat Socket Handlers', () => {
       registerChatHandlers(io as any, socket as any);
     });
 
-    it('should broadcast chat:typing to other room members', () => {
-      socket._handlers.get('chat:typing')!({ roomId: 'room-1' });
+    it('should broadcast chat:typing to other room members', async () => {
+      await socket._handlers.get('chat:typing')!({ roomId: 'room-1' });
 
       const broadcast = socket._toEmitted.find((e) => e.event === 'chat:typing');
       expect(broadcast).toBeDefined();
@@ -266,8 +281,8 @@ describe('Chat Socket Handlers', () => {
       registerChatHandlers(io as any, socket as any);
     });
 
-    it('should broadcast chat:stopTyping to other room members', () => {
-      socket._handlers.get('chat:stopTyping')!({ roomId: 'room-1' });
+    it('should broadcast chat:stopTyping to other room members', async () => {
+      await socket._handlers.get('chat:stopTyping')!({ roomId: 'room-1' });
 
       const broadcast = socket._toEmitted.find((e) => e.event === 'chat:stopTyping');
       expect(broadcast).toBeDefined();

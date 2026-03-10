@@ -54,7 +54,6 @@ class UploadService {
         mimeType,
       });
     } catch (error: any) {
-      console.error('Upload error:', error);
       return {
         success: false,
         message: error.message || 'Failed to upload image',
@@ -90,7 +89,6 @@ class UploadService {
       return transformUrl(result.data.url);
     }
 
-    console.error('Failed to upload image:', result.message);
     return null;
   }
 }

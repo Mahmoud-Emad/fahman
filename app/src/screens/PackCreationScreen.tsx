@@ -27,18 +27,13 @@ import type {
 import { packsService, type CreateQuestionData } from "@/services/packsService";
 import { uploadService } from "@/services/uploadService";
 import { useToast } from "@/contexts";
-import { SOCKET_URL } from "@/config/env";
 import { colors } from "@/themes";
+import { transformUrl } from "@/utils/transformUrl";
 import { PACK_LIMITS } from "@/constants";
 import type { RootStackParamList } from "../../App";
 
 type PackCreationNavigationProp = StackNavigationProp<RootStackParamList, "PackCreation">;
 type PackCreationRouteProp = RouteProp<RootStackParamList, "PackCreation">;
-
-function transformImageUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, SOCKET_URL);
-}
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -54,6 +49,7 @@ const createEmptyQuestion = (): QuestionFormData => ({
 const getInitialFormData = (): PackFormData => ({
   title: "",
   description: "",
+  textHint: "",
   logoUri: null,
   isPublic: true,
   questions: [],
@@ -90,14 +86,15 @@ export function PackCreationScreen() {
           setFormData({
             title: pack.title,
             description: pack.description || "",
-            logoUri: transformImageUrl(pack.imageUrl),
+            textHint: (pack as any).textHint || "",
+            logoUri: transformUrl(pack.imageUrl) || null,
             isPublic: pack.visibility === "PUBLIC",
             questions: pack.questions.map((q) => ({
               id: q.id,
               text: q.text,
               answers: q.options,
               correctAnswerIndices: q.correctAnswers,
-              imageUri: transformImageUrl(q.mediaUrl),
+              imageUri: transformUrl(q.mediaUrl) || null,
               isExpanded: false,
             })),
           });
@@ -269,8 +266,9 @@ export function PackCreationScreen() {
       if (isEditing && packId) {
         const packResponse = await packsService.updatePack(packId, {
           title: formData.title,
-          description: formData.description || null,
-          imageUrl: packImageUrl,
+          description: formData.description || undefined,
+          textHint: formData.textHint || undefined,
+          imageUrl: packImageUrl || undefined,
           visibility: formData.isPublic ? "PUBLIC" : "PRIVATE",
         });
         if (!packResponse.success) {
@@ -288,8 +286,8 @@ export function PackCreationScreen() {
             options: q.answers,
             correctAnswers: q.correctAnswerIndices.length > 0 ? q.correctAnswerIndices : [0],
             questionType: "SINGLE",
-            mediaUrl: q.uploadedImageUrl || null,
-            mediaType: q.uploadedImageUrl ? "IMAGE" : null,
+            mediaUrl: q.uploadedImageUrl || undefined,
+            mediaType: q.uploadedImageUrl ? "IMAGE" : undefined,
             timeLimit: 30,
             points: 100,
           };
@@ -297,7 +295,7 @@ export function PackCreationScreen() {
           if (existingIds.has(q.id)) {
             await packsService.updateQuestion(q.id, questionData);
           } else {
-            await packsService.addQuestion(packId, { ...questionData, orderIndex: i + 1 });
+            await packsService.addQuestion(packId, questionData);
           }
         }
 
@@ -310,8 +308,9 @@ export function PackCreationScreen() {
       } else {
         const packResponse = await packsService.createPack({
           title: formData.title,
-          description: formData.description || null,
-          imageUrl: packImageUrl,
+          description: formData.description || undefined,
+          textHint: formData.textHint || undefined,
+          imageUrl: packImageUrl || undefined,
           visibility: formData.isPublic ? "PUBLIC" : "PRIVATE",
         });
         if (!packResponse.success || !packResponse.data) {
@@ -325,11 +324,10 @@ export function PackCreationScreen() {
           options: q.answers,
           correctAnswers: q.correctAnswerIndices.length > 0 ? q.correctAnswerIndices : [0],
           questionType: "SINGLE" as const,
-          mediaUrl: q.uploadedImageUrl || null,
-          mediaType: q.uploadedImageUrl ? ("IMAGE" as const) : null,
+          mediaUrl: q.uploadedImageUrl || undefined,
+          mediaType: q.uploadedImageUrl ? ("IMAGE" as const) : undefined,
           timeLimit: 30,
           points: 100,
-          orderIndex: index + 1,
         }));
 
         const questionsResponse = await packsService.addQuestionsBulk(targetPackId!, questions);
@@ -413,6 +411,9 @@ export function PackCreationScreen() {
               onUpdateDescription={(description) => {
                 setFormData((prev) => ({ ...prev, description }));
                 clearError("description");
+              }}
+              onUpdateTextHint={(textHint) => {
+                setFormData((prev) => ({ ...prev, textHint }));
               }}
               onTogglePublic={() => setFormData((prev) => ({ ...prev, isPublic: !prev.isPublic }))}
             />

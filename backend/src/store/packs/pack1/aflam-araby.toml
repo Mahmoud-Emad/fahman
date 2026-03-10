@@ -1,0 +1,101 @@
+[pack-info]
+name = "افلام و مسلسلات مصريه"
+description = "خمن الافيه اتقال في مسلسل او فيلم ايه و قول اسم الفيلم/مسلسل 😂💃🔥"
+version = "1.0.0"
+author = "Mahmoud Emad"
+cover = "./media/cover.jpg"
+text-hint = "اكتب اسم الفيلم/مسلسل اللي اتقال فيه الافيه ده"
+price = 20
+preview-questions = 3
+number-of-questions = 20
+
+[question1]
+question = "انا مش كرم انا كريم"
+answer = "الداده دودي"
+cover = "./media/question1.jpg"
+
+[question2]
+question = "انا بابا يلا"
+answer = "تيتو"
+
+[question3]
+question = "انا ماما يلا"
+answer = "الحرب العالميه التالته"
+
+[question4]
+question = "انا زي بابا بالظبط"
+answer = "الناظر"
+
+[question5]
+question = "اقتلي امك وانزلي"
+answer = "بوحه"
+
+[question6]
+question = "يابن المحظوظه يا فوزي"
+answer = "عندليب الدقي"
+
+[question7]
+question = "ده انا كفاله و لسه القضيه شفاله"
+answer = "حمله فريزر"
+
+[question8]
+question = "انا بموت يا فخري"
+answer = "جانا البيان التالي"
+
+[question9]
+question = "هو ده جوزك ابو عيالك؟ ده كلب"
+answer = "ولاد العم"
+
+[question10]
+question = "هو عشان عبيط يعني تقوم تضحك عليه؟"
+answer = "صعيدي في الجامعه الامريكيه"
+cover = "./media/question10.jpg"
+
+[question11]
+question = "شوفت اللعب يا روح امك؟"
+answer = "مهمه صعبه"
+
+
+[question12]
+question = "مين؟ الملك توت عنخ ميمون؟"
+answer = "الحرب العالميه التالته"
+
+
+[question13]
+question = "انت عفريت يلا ولا ثديات؟😂"
+answer = "الحرب العالميه التالته"
+
+
+[question14]
+question = "عليا الطلاق بالتلاته انت اتخضييييت"
+answer = "كتكوت"
+
+
+[question15]
+question = "كخ يا حماده كخ"
+answer = "عسكر في المعسكر"
+
+
+[question16]
+question = "من النهارده مفيش حكومه،، انا الحكومه"
+answer = "الجزيره"
+
+
+[question17]
+question = "العالم ده كله بتاعي"
+answer = "الريس عمر حرب"
+
+
+[question18]
+question = "انا اقدم واحد في العماره دي"
+answer = "عماره يعقوبيان"
+
+
+[question19]
+question = "فين يا اماني الفراخ واللحمه اللي قال عليهم"
+answer = "صرخه نمله"
+
+
+[question20]
+question = "برضه اسال اي حد في الاستديو"
+answer = "سمير وشهير وبهير"

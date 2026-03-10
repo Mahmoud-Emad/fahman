@@ -1,10 +1,11 @@
 /**
- * LobbyPhase - Auto-graded question results view
- * Shows correct answer, each player's result, and "Next Question" for host.
+ * LobbyPhase - Host-graded question results view.
+ * Shows each player's result and "Next Question" for host.
+ * Answer options are never displayed — the host grades free-text answers.
  */
 import React from "react";
-import { View, Pressable } from "react-native";
-import { Text, Icon, Button, Avatar } from "@/components/ui";
+import { View } from "react-native";
+import { Text, Icon, Button } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import type { PlayerResult } from "../types";
 
@@ -15,11 +16,7 @@ interface LobbyPhaseProps {
   totalQuestions: number;
   /** Current question text */
   questionText: string;
-  /** Options that were displayed for this question */
-  options: string[];
-  /** Correct answer indices from server */
-  correctAnswer: number[] | null;
-  /** Per-player results from server grading */
+  /** Per-player results from host grading */
   questionResults: PlayerResult[] | null;
   /** Whether current user is the host */
   isHost: boolean;
@@ -29,17 +26,13 @@ interface LobbyPhaseProps {
   currentUserId: string;
 }
 
-const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
-
 /**
- * Lobby phase component - shows auto-graded results after each question
+ * Lobby phase component - shows host-graded results after each question
  */
 export function LobbyPhase({
   currentQuestion,
   totalQuestions,
   questionText,
-  options,
-  correctAnswer,
   questionResults,
   isHost,
   onNextQuestion,
@@ -64,54 +57,6 @@ export function LobbyPhase({
         <Text variant="body" className="font-semibold">
           {questionText}
         </Text>
-      </View>
-
-      {/* Options with correct answer highlighted */}
-      <View className="mb-4">
-        <Text variant="body" className="font-semibold mb-2">
-          Correct Answer
-        </Text>
-        {options.map((option, index) => {
-          const isCorrect = correctAnswer?.includes(index) ?? false;
-          return (
-            <View
-              key={index}
-              className="rounded-xl mb-2 p-3 flex-row items-center"
-              style={{
-                backgroundColor: isCorrect
-                  ? withOpacity(colors.success, 0.1)
-                  : colors.neutral[50],
-                borderWidth: 1.5,
-                borderColor: isCorrect ? colors.success : colors.neutral[200],
-              }}
-            >
-              <View
-                className="w-8 h-8 rounded-full items-center justify-center mr-3"
-                style={{
-                  backgroundColor: isCorrect ? colors.success : colors.neutral[200],
-                }}
-              >
-                <Text
-                  variant="body-sm"
-                  className="font-bold"
-                  style={{ color: isCorrect ? colors.white : colors.text.primary }}
-                >
-                  {OPTION_LETTERS[index] ?? String(index + 1)}
-                </Text>
-              </View>
-              <Text
-                variant="body"
-                className="flex-1 font-medium"
-                style={{ color: isCorrect ? colors.success : colors.text.secondary }}
-              >
-                {option}
-              </Text>
-              {isCorrect && (
-                <Icon name="checkmark-circle" size="md" color={colors.success} />
-              )}
-            </View>
-          );
-        })}
       </View>
 
       {/* Player Results */}

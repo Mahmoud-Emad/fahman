@@ -3,3 +3,12 @@ export { authService, type User, type AuthTokens, type AuthResponse } from './au
 export { storage } from './storage';
 export { uploadService, type UploadResponse } from './uploadService';
 export { storeService, type StoreData, type AvatarAlbum, type SoundSection, type SoundItem } from './storeService';
+export { friendsService, type Friend, type FriendWithStatus, type FriendRequest, type Friendship, type UserSearchResult } from './friendsService';
+export { roomsService, type Room, type RoomMember, type CreateRoomData, type JoinRoomData, type RoomsListResponse, type GameState, type SubmitAnswerData, type AnswerResult, type LeaderboardEntry } from './roomsService';
+export { packsService, type Pack, type PackSelectionResponse, type Question, type PackWithQuestions, type CreatePackData, type CreateQuestionData, type PacksListResponse } from './packsService';
+export { messageService, type Message, type Conversation as MessageConversation, type ConversationMessagesResponse, type UnreadCountResponse as MessageUnreadCountResponse } from './messageService';
+export { notificationService, type Notification, type PaginationMeta, type GetNotificationsResponse, type UnreadCountResponse as NotificationUnreadCountResponse } from './notificationService';
+export { settingsService, type UserSettings, type UpdateSettingsData } from './settingsService';
+export { socketService, type RoomMemberInfo, type RoomInfo, type GameStartedData, type QuestionData, type QuestionResultsData, type GameFinishedData, type PlayerScore, type ChatMessage, type DirectMessage as SocketDirectMessage, type NotificationData, type NotificationUpdateData } from './socketService';
+export { avatarService, type AvatarImage, type AvatarAlbum as AvatarServiceAlbum, type AvatarsResponse } from './avatarService';
+export { userService, type UserStats, type RecentGame, type Achievement, type PublicUserProfile } from './userService';

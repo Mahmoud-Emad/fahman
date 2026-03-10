@@ -180,7 +180,7 @@ export function LoginScreen() {
               fontFamily: "sans-serif-condensed",
               color: colors.white,
               letterSpacing: 4,
-              textShadowColor: "rgba(0, 0, 0, 0.3)",
+              textShadowColor: withOpacity(colors.black, 0.3),
               textShadowOffset: { width: 2, height: 2 },
               textShadowRadius: 2,
               paddingTop: 12,

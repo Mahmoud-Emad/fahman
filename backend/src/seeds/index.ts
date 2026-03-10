@@ -3,8 +3,9 @@
  * Populates database with test data
  */
 
-import { PrismaClient } from '@prisma/client';
-import { hashPassword } from '../utils/passwordUtils';
+import { PrismaClient, Role } from '@prisma/client';
+import { hashPassword } from '../shared/utils/passwordUtils';
+import { ACHIEVEMENT_SEEDS } from './achievements';
 
 const prisma = new PrismaClient();
 
@@ -16,21 +17,21 @@ async function seedUsers() {
       username: 'admin',
       email: 'admin@fahman.com',
       password: 'Admin123!',
-      role: 'ADMIN',
+      role: Role.ADMIN,
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin',
     },
     {
       username: 'testuser1',
       email: 'user1@test.com',
       password: 'Test123!',
-      role: 'NORMAL',
+      role: Role.NORMAL,
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
     },
     {
       username: 'testuser2',
       email: 'user2@test.com',
       password: 'Test123!',
-      role: 'NORMAL',
+      role: Role.NORMAL,
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=user2',
     },
   ];
@@ -131,12 +132,38 @@ async function seedPacks() {
   console.log('Packs seeded successfully');
 }
 
+async function seedAchievements() {
+  console.log('Seeding achievements...');
+
+  for (const achievement of ACHIEVEMENT_SEEDS) {
+    await prisma.achievement.upsert({
+      where: { slug: achievement.slug },
+      update: {
+        name: achievement.name,
+        description: achievement.description,
+        conditions: achievement.conditions,
+        sortOrder: achievement.sortOrder,
+      },
+      create: {
+        slug: achievement.slug,
+        name: achievement.name,
+        description: achievement.description,
+        conditions: achievement.conditions,
+        sortOrder: achievement.sortOrder,
+      },
+    });
+  }
+
+  console.log(`Seeded ${ACHIEVEMENT_SEEDS.length} achievements`);
+}
+
 async function main() {
   try {
     console.log('Starting seed process...');
 
     await seedUsers();
     await seedPacks();
+    await seedAchievements();
 
     console.log('Seed process completed successfully!');
   } catch (error) {

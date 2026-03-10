@@ -1,9 +1,11 @@
 /**
  * Direct Message Socket Event Handlers
+ * Uses Redis for typing status tracking
  */
 
 import { Server } from 'socket.io';
 import { prisma } from '../../config/database';
+import { getRedis } from '../../config/redis';
 import { MessageType, FriendshipStatus } from '@prisma/client';
 import {
   AuthenticatedSocket,
@@ -11,11 +13,9 @@ import {
   ServerToClientEvents,
   DirectMessage,
 } from '../types';
-import logger from '../../utils/logger';
+import logger from '../../shared/utils/logger';
 
-// Track typing status for DMs (userId -> recipientId -> timestamp)
-const dmTypingUsers: Map<string, Map<string, number>> = new Map();
-const TYPING_TIMEOUT = 3000;
+const TYPING_TTL = 5; // 5 seconds
 
 export function registerDmHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -118,11 +118,11 @@ export function registerDmHandlers(
       socket.emit('dm:message', dmMessage);
 
       // Clear typing status
-      clearDmTypingStatus(socket.userId, recipientId);
+      await clearDmTypingStatus(socket.userId, recipientId);
 
       logger.debug(`DM sent from ${socket.username} to ${recipient.username}`);
-    } catch (error: any) {
-      logger.error(`Error sending DM: ${error.message}`);
+    } catch (error) {
+      logger.error(`Error sending DM: ${error instanceof Error ? error.message : error}`);
       socket.emit('error', { message: 'Failed to send message' });
     }
   });
@@ -132,8 +132,7 @@ export function registerDmHandlers(
    */
   socket.on('dm:typing', async ({ recipientId }) => {
     try {
-      // Set typing status
-      setDmTypingStatus(socket.userId, recipientId);
+      await setDmTypingStatus(socket.userId, recipientId);
 
       // Get sender name
       const sender = await prisma.user.findUnique({
@@ -152,33 +151,17 @@ export function registerDmHandlers(
         }
       });
 
-      // Auto-clear after timeout
-      setTimeout(() => {
-        const userTyping = dmTypingUsers.get(socket.userId);
-        if (userTyping) {
-          const timestamp = userTyping.get(recipientId);
-          if (timestamp && Date.now() - timestamp >= TYPING_TIMEOUT) {
-            clearDmTypingStatus(socket.userId, recipientId);
-            // Notify recipient that typing stopped
-            io.sockets.sockets.forEach((s) => {
-              const authSocket = s as AuthenticatedSocket;
-              if (authSocket.userId === recipientId) {
-                authSocket.emit('dm:stopTyping', { senderId: socket.userId });
-              }
-            });
-          }
-        }
-      }, TYPING_TIMEOUT);
-    } catch (error: any) {
-      logger.error(`Error handling DM typing: ${error.message}`);
+      // Redis TTL handles auto-cleanup — no setTimeout needed
+    } catch (error) {
+      logger.error(`Error handling DM typing: ${error instanceof Error ? error.message : error}`);
     }
   });
 
   /**
    * User stopped typing a DM
    */
-  socket.on('dm:stopTyping', ({ recipientId }) => {
-    clearDmTypingStatus(socket.userId, recipientId);
+  socket.on('dm:stopTyping', async ({ recipientId }) => {
+    await clearDmTypingStatus(socket.userId, recipientId);
 
     // Notify recipient
     io.sockets.sockets.forEach((s) => {
@@ -214,40 +197,41 @@ export function registerDmHandlers(
       });
 
       logger.debug(`${socket.username} marked messages from ${senderId} as read`);
-    } catch (error: any) {
-      logger.error(`Error marking DMs as read: ${error.message}`);
+    } catch (error) {
+      logger.error(`Error marking DMs as read: ${error instanceof Error ? error.message : error}`);
     }
   });
 }
 
 /**
- * Set DM typing status
+ * Set DM typing status in Redis with TTL
  */
-function setDmTypingStatus(userId: string, recipientId: string): void {
-  if (!dmTypingUsers.has(userId)) {
-    dmTypingUsers.set(userId, new Map());
-  }
-  dmTypingUsers.get(userId)!.set(recipientId, Date.now());
+async function setDmTypingStatus(userId: string, recipientId: string): Promise<void> {
+  const redis = getRedis();
+  await redis.set(`typing:dm:${userId}:${recipientId}`, '1', 'EX', TYPING_TTL);
 }
 
 /**
  * Clear DM typing status
  */
-function clearDmTypingStatus(userId: string, recipientId: string): void {
-  const userTyping = dmTypingUsers.get(userId);
-  if (userTyping) {
-    userTyping.delete(recipientId);
-    if (userTyping.size === 0) {
-      dmTypingUsers.delete(userId);
-    }
-  }
+async function clearDmTypingStatus(userId: string, recipientId: string): Promise<void> {
+  const redis = getRedis();
+  await redis.del(`typing:dm:${userId}:${recipientId}`);
 }
 
 /**
  * Clean up DM typing status when user disconnects
  */
-export function cleanupUserDmTyping(userId: string): void {
-  dmTypingUsers.delete(userId);
+export async function cleanupUserDmTyping(userId: string): Promise<void> {
+  try {
+    const redis = getRedis();
+    const keys = await redis.keys(`typing:dm:${userId}:*`);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
+  } catch {
+    // Best effort cleanup
+  }
 }
 
 /**

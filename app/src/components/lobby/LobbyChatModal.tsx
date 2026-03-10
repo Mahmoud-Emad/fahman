@@ -8,7 +8,6 @@ import React, { useRef, useEffect, useCallback } from "react";
 import {
   View,
   FlatList,
-  TextInput,
   Pressable,
   KeyboardAvoidingView,
   Platform,
@@ -16,10 +15,11 @@ import {
   Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Text, Icon } from "@/components/ui";
+import { Text, Icon, EmptyState } from "@/components/ui";
+import { MessageInput } from "@/components/messaging/MessageInput";
 import { colors, withOpacity } from "@/themes";
 import { MODAL_SIZES } from "@/constants";
-import { ChatBubble } from "./ChatBubble";
+import { ChatBubble } from "@/components/chat";
 import type { ChatMessage } from "./types";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -29,9 +29,7 @@ interface LobbyChatModalProps {
   onClose: () => void;
   messages: ChatMessage[];
   currentUserId: string;
-  chatInput: string;
-  onChatInputChange: (text: string) => void;
-  onSendMessage: () => void;
+  onSendMessage: (text: string) => void;
 }
 
 const ANIM_DURATION = 250;
@@ -42,8 +40,6 @@ export function LobbyChatModal({
   onClose,
   messages,
   currentUserId,
-  chatInput,
-  onChatInputChange,
   onSendMessage,
 }: LobbyChatModalProps) {
   const insets = useSafeAreaInsets();
@@ -51,7 +47,6 @@ export function LobbyChatModal({
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const isOpen = useRef(false);
-  const inputRef = useRef<TextInput>(null);
 
   // Slide in / out
   useEffect(() => {
@@ -72,8 +67,6 @@ export function LobbyChatModal({
         }),
       ]).start();
     } else if (isOpen.current) {
-      // Dismiss keyboard before animating out
-      inputRef.current?.blur();
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -94,7 +87,6 @@ export function LobbyChatModal({
   // Auto-scroll when new messages arrive while open
   useEffect(() => {
     if (visible && messages.length > 0) {
-      // Small delay so FlatList has time to append the item
       const id = setTimeout(() => {
         listRef.current?.scrollToEnd({ animated: true });
       }, 80);
@@ -104,14 +96,24 @@ export function LobbyChatModal({
 
   const renderItem = useCallback(
     ({ item }: { item: ChatMessage }) => (
-      <ChatBubble message={item} isOwn={item.senderId === currentUserId} />
+      <ChatBubble
+        isCurrentUser={item.senderId === currentUserId}
+        type={item.type === "system" ? "system" : "text"}
+        text={item.message}
+        senderName={item.senderName}
+        senderInitials={item.senderInitials}
+        senderAvatar={item.senderAvatar}
+        timestamp={item.timestamp}
+        systemVariant={item.systemVariant}
+        showAvatar
+        showSenderName
+        variant="room"
+      />
     ),
     [currentUserId],
   );
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
-
-  const canSend = chatInput.trim().length > 0;
 
   // Don't mount anything until first open
   if (!visible && !isOpen.current) return null;
@@ -185,19 +187,12 @@ export function LobbyChatModal({
 
           {/* Messages */}
           {messages.length === 0 ? (
-            <View className="items-center justify-center py-16">
-              <View
-                className="w-14 h-14 rounded-full items-center justify-center mb-3"
-                style={{ backgroundColor: withOpacity(colors.primary[500], 0.08) }}
-              >
-                <Icon name="chatbubble-outline" size="lg" color={colors.neutral[300]} />
-              </View>
-              <Text variant="body-sm" color="muted">
-                No messages yet
-              </Text>
-              <Text variant="caption" color="muted" className="mt-1">
-                Say hi to your fellow players!
-              </Text>
+            <View style={{ flex: 1, justifyContent: "center" }}>
+              <EmptyState
+                icon="chatbubble-outline"
+                title="No messages yet"
+                description="Say hi to your fellow players!"
+              />
             </View>
           ) : (
             <FlatList
@@ -219,46 +214,8 @@ export function LobbyChatModal({
           )}
 
           {/* Input bar */}
-          <View
-            className="flex-row items-center gap-2 px-4 pt-2"
-            style={{
-              borderTopWidth: 1,
-              borderTopColor: colors.neutral[100],
-              paddingBottom: insets.bottom + 16,
-            }}
-          >
-            <TextInput
-              ref={inputRef}
-              value={chatInput}
-              onChangeText={onChatInputChange}
-              placeholder="Type a message..."
-              placeholderTextColor={colors.neutral[400]}
-              className="flex-1 rounded-full px-4 py-2.5"
-              style={{
-                backgroundColor: colors.neutral[50],
-                fontSize: 14,
-                color: colors.text.primary,
-                borderWidth: 1,
-                borderColor: canSend ? colors.primary[500] : colors.neutral[200],
-              }}
-              onSubmitEditing={onSendMessage}
-              returnKeyType="send"
-              maxLength={500}
-            />
-            <Pressable
-              onPress={onSendMessage}
-              disabled={!canSend}
-              className="w-10 h-10 rounded-full items-center justify-center active:scale-95"
-              style={{
-                backgroundColor: canSend ? colors.primary[500] : colors.neutral[200],
-              }}
-            >
-              <Icon
-                name="send"
-                customSize={18}
-                color={canSend ? colors.white : colors.neutral[400]}
-              />
-            </Pressable>
+          <View style={{ paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }}>
+            <MessageInput onSend={onSendMessage} />
           </View>
         </KeyboardAvoidingView>
       </Animated.View>

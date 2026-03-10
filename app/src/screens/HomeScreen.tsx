@@ -19,6 +19,7 @@ import { useMessaging, useFriends, useAuth, usePacks } from "@/hooks";
 import { useToast } from "@/contexts";
 import { storeService } from "@/services/storeService";
 import { colors, withOpacity } from "@/themes";
+import { UI_TIMING } from "@/constants";
 import type { RootStackParamList } from "../../App";
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
@@ -71,7 +72,7 @@ function ExitConfirmationModal({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
+            backgroundColor: withOpacity(colors.black, 0.6),
             opacity: opacityAnim,
           }}
         >
@@ -319,7 +320,7 @@ export function HomeScreen() {
                 fontFamily: "sans-serif-condensed",
                 color: colors.white,
                 letterSpacing: 4,
-                textShadowColor: "rgba(0, 0, 0, 0.3)",
+                textShadowColor: withOpacity(colors.black, 0.3),
                 textShadowOffset: { width: 2, height: 2 },
                 textShadowRadius: 2,
                 paddingTop: 12,
@@ -447,7 +448,7 @@ export function HomeScreen() {
         onCoinsUpdated={handleCoinsUpdated}
         onBuyCoins={() => {
           setMarketplaceVisible(false);
-          setTimeout(() => setBuyCoinsVisible(true), 300);
+          setTimeout(() => setBuyCoinsVisible(true), UI_TIMING.MODAL_TRANSITION_DELAY);
         }}
         onAvatarSelect={async (avatarUrl) => {
           try {

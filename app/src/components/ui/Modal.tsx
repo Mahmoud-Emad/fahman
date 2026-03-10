@@ -1,23 +1,27 @@
 /**
  * Modal/Dialog component - Overlay dialog for important content
  * Slides up from bottom with dark backdrop fade
+ *
+ * Uses absolute-positioned overlay instead of RNModal to avoid
+ * mount/unmount lifecycle issues that cause close-animation glitches.
  */
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Modal as RNModal,
   View,
   Pressable,
-  type ModalProps as RNModalProps,
   type ViewStyle,
   ScrollView,
   Dimensions,
   Animated,
+  BackHandler,
+  Platform,
+  StyleSheet,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/utils/cn";
 import { Text } from "./Text";
 import { Button } from "./Button";
-import { colors } from "@/themes";
+import { colors, withOpacity } from "@/themes";
 import { MODAL_SIZES } from "@/constants";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -25,7 +29,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 /**
  * Props for the Modal component
  */
-export interface ModalProps extends Omit<RNModalProps, "style"> {
+export interface ModalProps {
   /** Whether the modal is visible */
   visible: boolean;
   /** Callback when modal should close */
@@ -68,7 +72,7 @@ export interface ModalProps extends Omit<RNModalProps, "style"> {
 
 /**
  * Modal component for overlay dialogs
- * Backdrop fades in, content slides up from bottom
+ * Renders as an absolute-positioned overlay within the parent screen.
  */
 export function Modal({
   visible,
@@ -90,11 +94,14 @@ export function Modal({
   margin,
   shadow = "shadow-xl",
   style,
-  ...props
 }: ModalProps) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  // rendered = overlay is in the tree; visible = prop from parent
+  const [rendered, setRendered] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Calculate max height
   const calculatedMaxHeight =
@@ -104,75 +111,77 @@ export function Modal({
         ? maxHeight
         : SCREEN_HEIGHT * MODAL_SIZES.DEFAULT_HEIGHT;
 
+  // Open: mount overlay, then animate in
   useEffect(() => {
     if (visible) {
-      // Animate in: fade backdrop and slide content up
+      slideAnim.setValue(SCREEN_HEIGHT);
+      fadeAnim.setValue(0);
+      setRendered(true);
+      // Start animation on the next frame so the overlay is mounted first
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            damping: 20,
+            stiffness: 150,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    } else if (rendered) {
+      // Close: animate out, then unmount overlay
       Animated.parallel([
         Animated.timing(fadeAnim, {
-          toValue: 1,
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: SCREEN_HEIGHT,
           duration: 250,
           useNativeDriver: true,
         }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          damping: 20,
-          stiffness: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // Reset for next open
-      slideAnim.setValue(SCREEN_HEIGHT);
-      fadeAnim.setValue(0);
+      ]).start(() => {
+        setRendered(false);
+      });
     }
-  }, [visible, slideAnim, fadeAnim]);
+  }, [visible]);
+
+  // Android back button
+  useEffect(() => {
+    if (!rendered || Platform.OS !== "android") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onCloseRef.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, [rendered]);
 
   const handleClose = () => {
-    // Animate out: fade backdrop and slide content down
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: SCREEN_HEIGHT,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onClose();
-    });
+    onCloseRef.current();
   };
 
-  return (
-    <RNModal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleClose}
-      {...props}
-    >
-      <View className="flex-1 justify-end">
-        {/* Animated Backdrop */}
-        <Animated.View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            opacity: fadeAnim,
-          }}
-        >
-          <Pressable
-            className="flex-1"
-            onPress={closeOnBackdrop ? handleClose : undefined}
-          />
-        </Animated.View>
+  if (!rendered) return null;
 
-        {/* Animated Modal Content */}
+  return (
+    <View style={overlayStyles.root} pointerEvents="box-none">
+      {/* Animated Backdrop */}
+      <Animated.View
+        style={[overlayStyles.backdrop, { opacity: fadeAnim }]}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={closeOnBackdrop ? handleClose : undefined}
+        />
+      </Animated.View>
+
+      {/* Bottom-aligned container for the sheet */}
+      <View style={overlayStyles.sheetContainer} pointerEvents="box-none">
         <Animated.View
           className={cn(bgColor, shadow, className)}
           style={[
@@ -227,9 +236,25 @@ export function Modal({
           </ScrollView>
         </Animated.View>
       </View>
-    </RNModal>
+    </View>
   );
 }
+
+const overlayStyles = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: withOpacity(colors.black, 0.5),
+  },
+  sheetContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+});
 
 /**
  * Dialog component - Specialized modal for confirmations and alerts
@@ -262,8 +287,11 @@ export function Dialog({
   ...props
 }: DialogProps) {
   const handleCancel = () => {
-    onCancel?.();
-    props.onClose();
+    if (onCancel) {
+      onCancel();
+    } else {
+      props.onClose();
+    }
   };
 
   return (

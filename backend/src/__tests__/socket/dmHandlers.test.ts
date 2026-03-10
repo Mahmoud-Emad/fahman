@@ -62,7 +62,22 @@ mock.module('../../config/database', () => ({
   },
 }));
 
-mock.module('../../utils/logger', () => ({
+// Redis mock
+const mockRedisSet = mock(() => Promise.resolve('OK'));
+const mockRedisDel = mock(() => Promise.resolve(1));
+const mockRedisKeys = mock(() => Promise.resolve([]));
+
+mock.module('../../config/redis', () => ({
+  getRedis: () => ({
+    set: mockRedisSet,
+    del: mockRedisDel,
+    keys: mockRedisKeys,
+  }),
+  connectRedis: () => Promise.resolve({}),
+  disconnectRedis: () => Promise.resolve(),
+}));
+
+mock.module('../../shared/utils/logger', () => ({
   default: {
     info: () => {},
     error: () => {},
@@ -343,22 +358,22 @@ describe('DM Socket Handlers', () => {
       registerDmHandlers(io as any, socket as any);
     });
 
-    it('should send dm:stopTyping to the recipient socket', () => {
+    it('should send dm:stopTyping to the recipient socket', async () => {
       const recipientSocket = createMockSocket('user-2', 'bob');
       io._addSocket('socket-2', recipientSocket);
 
-      socket._handlers.get('dm:stopTyping')!({ recipientId: 'user-2' });
+      await socket._handlers.get('dm:stopTyping')!({ recipientId: 'user-2' });
 
       const stopEmit = recipientSocket._emitted.find((e) => e.event === 'dm:stopTyping');
       expect(stopEmit).toBeDefined();
       expect(stopEmit!.data.senderId).toBe('user-1');
     });
 
-    it('should not notify other users', () => {
+    it('should not notify other users', async () => {
       const otherSocket = createMockSocket('user-3', 'carol');
       io._addSocket('socket-3', otherSocket);
 
-      socket._handlers.get('dm:stopTyping')!({ recipientId: 'user-2' });
+      await socket._handlers.get('dm:stopTyping')!({ recipientId: 'user-2' });
 
       expect(otherSocket._emitted.filter((e) => e.event === 'dm:stopTyping')).toHaveLength(0);
     });

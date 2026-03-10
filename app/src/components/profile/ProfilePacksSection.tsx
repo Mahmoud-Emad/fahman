@@ -5,20 +5,20 @@ import React from "react";
 import { View, Pressable, StyleSheet } from "react-native";
 import { Text, Icon } from "@/components/ui";
 import { UserPackCard, UserPackCardSkeleton, type UserPackData } from "./UserPackCard";
-import { UserRoomCard, UserRoomCardSkeleton } from "./UserRoomCard";
+import { UserRoomCard, UserRoomCardSkeleton, type UserRoomData } from "./UserRoomCard";
 import { colors } from "@/themes";
 
 interface ProfilePacksSectionProps {
   userPacks: UserPackData[];
   packsLoading: boolean;
-  userRooms: any[];
+  userRooms: UserRoomData[];
   roomsLoading: boolean;
   onPackPress: (pack: UserPackData) => void;
   onPackEdit: (pack: UserPackData) => void;
   onPackDelete: (pack: UserPackData) => void;
   onCreatePack: () => void;
-  onRoomPress: (room: any) => void;
-  onRoomDelete: (room: any) => void;
+  onRoomPress: (room: UserRoomData) => void;
+  onRoomDelete: (room: UserRoomData) => void;
 }
 
 /**

@@ -17,7 +17,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 interface PreferencesSectionProps {
   settings: UserSettings;
-  updateSetting: (key: keyof Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">, value: any) => void;
+  updateSetting: (key: keyof Omit<UserSettings, "id" | "userId" | "createdAt" | "updatedAt">, value: string | boolean) => void;
 }
 
 /**

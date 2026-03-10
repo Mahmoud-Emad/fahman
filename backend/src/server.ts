@@ -4,6 +4,7 @@
  */
 
 import 'dotenv/config';
+import { config } from './config/env';
 import express from 'express';
 import { createServer } from 'http';
 import helmet from 'helmet';
@@ -11,13 +12,16 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import logger from './utils/logger';
+import logger from './shared/utils/logger';
 import { connectDatabase, disconnectDatabase } from './config/database';
-import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
-import { generalLimiter } from './middlewares/rateLimiter';
+import { connectRedis, disconnectRedis } from './config/redis';
+import { errorHandler, notFoundHandler } from './shared/middleware/errorHandler';
+import { generalLimiter } from './shared/middleware/rateLimiter';
+import { requestId } from './shared/middleware/requestId';
 import { swaggerSpec } from './config/swagger';
 import routes from './routes';
 import { initializeSocket } from './socket';
+import { runAchievementJob } from './modules/game/achievementJob';
 
 // Read version from package.json
 const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
@@ -26,12 +30,13 @@ const VERSION = packageJson.version;
 // Create Express app and HTTP server
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 3000;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 // ============================================================================
 // MIDDLEWARE
 // ============================================================================
+
+// Request ID tracking
+app.use(requestId);
 
 // Security middleware - configure CSP for Swagger UI
 app.use(
@@ -50,7 +55,7 @@ app.use(
 // CORS configuration
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+    origin: config.cors.origin,
     credentials: true,
   })
 );
@@ -79,6 +84,7 @@ app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`, {
     ip: req.ip,
     userAgent: req.get('user-agent'),
+    requestId: req.requestId,
   });
   next();
 });
@@ -123,40 +129,40 @@ app.get('/', (_req, res) => {
     description: 'Backend API for Fahman - Multiplayer Quiz/Party Game',
     endpoints: {
       home: {
-        url: `${BASE_URL}/`,
+        url: `${config.baseUrl}/`,
         description: 'API information and public endpoints',
       },
       health: {
-        url: `${BASE_URL}/health`,
+        url: `${config.baseUrl}/health`,
         description: 'Health check endpoint',
       },
       docs: {
-        url: `${BASE_URL}/api-docs`,
+        url: `${config.baseUrl}/api-docs`,
         description: 'Interactive API documentation (Swagger UI)',
       },
       openapi: {
-        url: `${BASE_URL}/api-docs.json`,
+        url: `${config.baseUrl}/api-docs.json`,
         description: 'OpenAPI 3.0 specification (JSON)',
       },
       api: {
-        url: `${BASE_URL}/api`,
+        url: `${config.baseUrl}/api`,
         description: 'API endpoints',
         routes: {
-          auth: `${BASE_URL}/api/auth`,
-          packs: `${BASE_URL}/api/packs`,
-          rooms: `${BASE_URL}/api/rooms`,
-          friends: `${BASE_URL}/api/friends`,
-          notifications: `${BASE_URL}/api/notifications`,
+          auth: `${config.baseUrl}/api/auth`,
+          packs: `${config.baseUrl}/api/packs`,
+          rooms: `${config.baseUrl}/api/rooms`,
+          friends: `${config.baseUrl}/api/friends`,
+          notifications: `${config.baseUrl}/api/notifications`,
         },
       },
       websocket: {
-        url: BASE_URL.replace('http', 'ws'),
+        url: config.baseUrl.replace('http', 'ws'),
         description: 'WebSocket connection for real-time events',
       },
     },
     documentation: {
-      swagger: `${BASE_URL}/api-docs`,
-      openapi: `${BASE_URL}/api-docs.json`,
+      swagger: `${config.baseUrl}/api-docs`,
+      openapi: `${config.baseUrl}/api-docs.json`,
       postman: 'Import OpenAPI spec into Postman',
     },
   });
@@ -201,7 +207,7 @@ app.get('/health', (_req, res) => {
     version: VERSION,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
+    environment: config.env,
   });
 });
 
@@ -242,27 +248,61 @@ let server: ReturnType<typeof httpServer.listen>;
 
 async function startServer() {
   try {
-    // Connect to database
+    // Connect to database and Redis
     await connectDatabase();
+    await connectRedis();
 
-    // Initialize Socket.io
-    initializeSocket(httpServer);
+    // Initialize Socket.io and store registry on app
+    const socketRegistry = initializeSocket(httpServer);
+    app.set('socketRegistry', socketRegistry);
 
     // Start HTTP server (Express + Socket.io)
-    server = httpServer.listen(PORT, () => {
+    server = httpServer.listen(config.port, () => {
       logger.info(
-        `Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`
+        `Server running on port ${config.port} in ${config.env} mode`
       );
-      logger.info(`🏠 Home: ${BASE_URL}/`);
-      logger.info(`❤️  Health: ${BASE_URL}/health`);
-      logger.info(`📚 API Docs: ${BASE_URL}/api-docs`);
-      logger.info(`📄 OpenAPI Spec: ${BASE_URL}/api-docs.json`);
-      logger.info(`🔌 WebSocket: ${BASE_URL.replace('http', 'ws')}`);
+      logger.info(`Home: ${config.baseUrl}/`);
+      logger.info(`Health: ${config.baseUrl}/health`);
+      logger.info(`API Docs: ${config.baseUrl}/api-docs`);
+      logger.info(`OpenAPI Spec: ${config.baseUrl}/api-docs.json`);
+      logger.info(`WebSocket: ${config.baseUrl.replace('http', 'ws')}`);
     });
+
+    // Schedule daily achievement job at 3:00 AM
+    scheduleAchievementJob();
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
+}
+
+// ============================================================================
+// ACHIEVEMENT CRON JOB
+// ============================================================================
+
+let achievementTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleAchievementJob() {
+  function scheduleNext() {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(3, 0, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+
+    const delay = next.getTime() - now.getTime();
+    logger.info(`Achievement job scheduled for ${next.toISOString()} (in ${Math.round(delay / 60000)}min)`);
+
+    achievementTimer = setTimeout(async () => {
+      try {
+        await runAchievementJob();
+      } catch (error) {
+        logger.error('Achievement cron failed:', error);
+      }
+      scheduleNext();
+    }, delay);
+  }
+
+  scheduleNext();
 }
 
 // ============================================================================
@@ -272,9 +312,15 @@ async function startServer() {
 async function gracefulShutdown(signal: string) {
   logger.info(`${signal} received. Starting graceful shutdown...`);
 
+  if (achievementTimer) {
+    clearTimeout(achievementTimer);
+    achievementTimer = null;
+  }
+
   if (server) {
     server.close(async () => {
       logger.info('HTTP server closed');
+      await disconnectRedis();
       await disconnectDatabase();
       logger.info('Graceful shutdown completed');
       process.exit(0);

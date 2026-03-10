@@ -7,7 +7,7 @@ import { Text, Avatar, Pressable } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import type { Conversation } from "./types";
 import { formatMessageTime } from "./types";
-import { CURRENT_USER_ID } from "./mockData";
+import { useAuth } from "@/contexts";
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -21,10 +21,11 @@ export function ConversationItem({
   conversation,
   onPress,
 }: ConversationItemProps) {
+  const { user } = useAuth();
   const { participants, lastMessage, unreadCount } = conversation;
   const participant = participants[0]; // For 1:1 chats
   const isOnline = participant?.isOnline;
-  const isOwnMessage = lastMessage.senderId === CURRENT_USER_ID;
+  const isOwnMessage = lastMessage.senderId === user?.id;
 
   return (
     <Pressable

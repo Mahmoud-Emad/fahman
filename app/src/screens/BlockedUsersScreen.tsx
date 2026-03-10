@@ -4,8 +4,8 @@
 import React, { useState, useEffect } from "react";
 import { View, ScrollView, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon, Avatar, EmptyState, Pressable } from "@/components/ui";
-import { TopNavBar } from "@/components/navigation";
 import { colors } from "@/themes";
 import { friendsService, type Friend } from "@/services/friendsService";
 
@@ -31,6 +31,7 @@ function getInitials(name: string): string {
 
 export function BlockedUsersScreen() {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,12 +87,25 @@ export function BlockedUsersScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.background }}>
-      {/* Top Navigation */}
-      <TopNavBar
-        leftIcon="arrow-back"
-        onLeftPress={() => navigation.goBack()}
-        centerTitle="Blocked Users"
-      />
+      {/* Header */}
+      <View
+        className="flex-row items-center px-4 py-3"
+        style={{
+          paddingTop: insets.top + 8,
+          backgroundColor: colors.primary[500],
+        }}
+      >
+        <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2" delayPressIn={0}>
+          <Icon name="arrow-back" color={colors.white} size="lg" />
+        </Pressable>
+        <Text
+          variant="h3"
+          className="flex-1 text-center mr-8"
+          style={{ color: colors.white }}
+        >
+          Blocked Users
+        </Text>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}

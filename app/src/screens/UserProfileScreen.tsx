@@ -131,7 +131,7 @@ export function UserProfileScreen() {
       if (response.success) {
         toast.success("Friend request sent!");
         setProfile((prev) =>
-          prev ? { ...prev, pendingRequest: { id: response.data?.request?.id || "", isSentByMe: true } } : null
+          prev ? { ...prev, pendingRequest: { id: response.data?.id || "", isSentByMe: true } } : null
         );
       } else {
         toast.error(response.message || "Failed to send request");
@@ -234,7 +234,7 @@ export function UserProfileScreen() {
       stats: userStats
         ? { gamesPlayed: userStats.gamesPlayed, wins: userStats.wins, winRate: userStats.winRate, friends: profile.friendsCount, currentStreak: userStats.currentStreak, bestStreak: userStats.bestStreak }
         : { gamesPlayed: 0, wins: 0, winRate: 0, friends: profile.friendsCount, currentStreak: 0, bestStreak: 0 },
-      achievements: achievements.map((a) => ({ id: a.id, name: a.title, icon: a.icon as any, color: colors.gold, earned: !!a.unlockedAt })),
+      achievements: achievements.map((a) => ({ id: a.id, name: a.name, icon: "trophy" as any, color: colors.gold, earned: a.unlocked })),
       recentGames: recentGames.map((g) => ({ id: g.id, packName: g.packTitle, result: g.result, score: g.score, date: new Date(g.playedAt).toLocaleDateString() })),
     };
   }, [profile, userStats, achievements, recentGames]);

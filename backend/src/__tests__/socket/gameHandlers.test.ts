@@ -102,14 +102,14 @@ mock.module('../../config/database', () => ({
   },
 }));
 
-mock.module('../../services/gameService', () => ({
+mock.module('../../modules/game/gameService', () => ({
   default: {
     submitAnswer: mockSubmitAnswer,
     nextQuestion: mockNextQuestion,
   },
 }));
 
-mock.module('../../utils/logger', () => ({
+mock.module('../../shared/utils/logger', () => ({
   default: {
     info: () => {},
     error: () => {},

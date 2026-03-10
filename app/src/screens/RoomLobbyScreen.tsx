@@ -14,6 +14,7 @@ import {
   PlayersModal,
   LobbyChatModal,
   LobbyHeader,
+  LobbyDMFab,
   type Player,
   type ChatMessage,
   type InviteUser,
@@ -25,9 +26,11 @@ import { friendsService } from "@/services/friendsService";
 import { roomsService } from "@/services/roomsService";
 import { messageService } from "@/services/messageService";
 import { useToast } from "@/contexts";
+import { UI_TIMING } from "@/constants";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 import { socketService, type RoomMemberInfo, type ChatMessage as SocketChatMessage } from "@/services/socketService";
 import { useAuth, useSound } from "@/hooks";
+import { useMessaging } from "@/contexts";
 
 type RoomLobbyNavigationProp = StackNavigationProp<RootStackParamList, "RoomLobby">;
 type RoomLobbyRouteProp = RouteProp<RootStackParamList, "RoomLobby">;
@@ -46,6 +49,7 @@ export function RoomLobbyScreen() {
   const toast = useToast();
   const { user } = useAuth();
   const { playMessageSound } = useSound();
+  const messaging = useMessaging();
 
   const { pack, config, isHost: routeIsHost, room } = route.params;
   const currentUserId = user?.id ?? "";
@@ -64,7 +68,6 @@ export function RoomLobbyScreen() {
   const roomId = room?.id ?? "";
   const [players, setPlayers] = useState<Player[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
 
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [userSelectVisible, setUserSelectVisible] = useState(false);
@@ -290,10 +293,10 @@ export function RoomLobbyScreen() {
     return unsubscribe;
   }, [navigation]);
 
-  const handleSendMessage = () => {
-    if (!chatInput.trim() || !roomId) return;
+  const handleSendMessage = (text: string) => {
+    if (!text.trim() || !roomId) return;
 
-    socketService.sendChatMessage(roomId, chatInput.trim());
+    socketService.sendChatMessage(roomId, text.trim());
 
     setMessages((prev) => [
       ...prev,
@@ -304,12 +307,11 @@ export function RoomLobbyScreen() {
         senderInitials: user?.displayName
           ? getInitials(user.displayName)
           : getInitials(user?.username || "User"),
-        message: chatInput.trim(),
+        message: text.trim(),
         timestamp: new Date(),
         type: "user",
       },
     ]);
-    setChatInput("");
   };
 
   const handleOpenChat = () => {
@@ -319,7 +321,7 @@ export function RoomLobbyScreen() {
 
   const handleInviteFromPlayersModal = () => {
     setPlayersModalVisible(false);
-    setTimeout(() => setShareModalVisible(true), 300);
+    setTimeout(() => setShareModalVisible(true), UI_TIMING.MODAL_TRANSITION_DELAY);
   };
 
   const handleInAppShare = () => {
@@ -327,7 +329,7 @@ export function RoomLobbyScreen() {
     setTimeout(() => {
       setUserSelectVisible(true);
       fetchFriendsForInvite();
-    }, 300);
+    }, UI_TIMING.MODAL_TRANSITION_DELAY);
   };
 
   const handleSendInvites = async (userIds: string[]) => {
@@ -636,8 +638,6 @@ export function RoomLobbyScreen() {
         onClose={() => setChatModalVisible(false)}
         messages={messages}
         currentUserId={currentUserId}
-        chatInput={chatInput}
-        onChatInputChange={setChatInput}
         onSendMessage={handleSendMessage}
       />
 
@@ -678,6 +678,23 @@ export function RoomLobbyScreen() {
         message={`Are you sure you want to remove ${removeFriendTarget?.playerName ?? "this player"} from your friends?`}
         confirmLabel="Remove"
         icon="person-remove"
+      />
+
+      {/* Private Messages FAB */}
+      <LobbyDMFab
+        conversations={messaging.conversations}
+        unreadCount={messaging.unreadMessageCount}
+        isLoading={messaging.chatsLoading}
+        onConversationPress={messaging.handleConversationPress}
+        activeConversation={messaging.activeConversation}
+        activeMessages={messaging.activeMessages}
+        onSendMessage={messaging.handleSendDirectMessage}
+        onDeleteMessage={messaging.handleDeleteMessage}
+        onJoinRoom={messaging.handleJoinRoomFromChat}
+        currentUserId={messaging.currentUserId}
+        onBack={() => messaging.setChatDetailsVisible(false)}
+        chatActive={messaging.chatDetailsVisible}
+        bottomOffset={80}
       />
     </View>
   );

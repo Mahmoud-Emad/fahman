@@ -232,13 +232,6 @@ class RoomsService {
     return api.patch<Room>(`/rooms/${roomId}`, data);
   }
 
-  /**
-   * Close/delete a room
-   */
-  async closeRoom(roomId: string): Promise<ApiResponse<null>> {
-    return api.delete<null>(`/rooms/${roomId}`);
-  }
-
   // ============================================
   // Game Operations
   // ============================================

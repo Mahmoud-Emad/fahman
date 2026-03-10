@@ -13,10 +13,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CONFETTI_COLORS = [
   colors.primary[500],
   colors.medals.gold.bg,
-  "#FF6B6B", // coral red
-  "#4ECDC4", // teal
-  "#A855F7", // purple
-  "#3B82F6", // blue
+  colors.confetti.coral,
+  colors.confetti.teal,
+  colors.confetti.purple,
+  colors.confetti.blue,
 ] as const;
 
 export interface Winner {

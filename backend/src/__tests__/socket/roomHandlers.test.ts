@@ -52,7 +52,7 @@ mock.module('../../config/database', () => ({
   },
 }));
 
-mock.module('../../utils/logger', () => ({
+mock.module('../../shared/utils/logger', () => ({
   default: {
     info: () => {},
     error: () => {},

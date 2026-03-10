@@ -1,0 +1,50 @@
+[pack-info]
+name = "Game of Thrones"
+description = "Test your knowledge of the world of Westeros and its legendary characters."
+version = "1.0.0"
+author = "Fahman"
+cover = "./media/got.png"
+text-hint = ""
+price = 0
+preview-questions = 0
+number-of-questions = 10
+
+[question1]
+question = "What is the name of the Stark family castle?"
+answer = "Winterfell"
+
+[question2]
+question = "What is the name of Jon Snow's direwolf?"
+answer = "Ghost"
+
+[question3]
+question = "Who is known as the Mother of Dragons?"
+answer = "Daenerys Targaryen"
+
+[question4]
+question = "What is the name of the continent where most of the story takes place?"
+answer = "Westeros"
+
+[question5]
+question = "What is the motto of House Stark?"
+answer = "Winter is Coming"
+
+[question6]
+question = "Who killed the Night King?"
+answer = "Arya Stark"
+
+[question7]
+question = "What is the name of the sword made from Valyrian steel given to Jon Snow by Jeor Mormont?"
+answer = "Longclaw"
+
+[question8]
+question = "What is the capital of the Seven Kingdoms?"
+answer = "King's Landing"
+
+[question9]
+question = "What is the name of Daenerys Targaryen's largest dragon?"
+answer = "Drogon"
+
+[question10]
+question = "What is the name of the giant ice wall that protects the Seven Kingdoms from the north?"
+answer = "The Wall"

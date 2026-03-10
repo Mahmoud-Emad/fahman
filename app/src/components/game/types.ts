@@ -50,7 +50,7 @@ export interface GameState {
   gamePhase: GamePhase;
 
   // Player answer state
-  selectedAnswer: number | null;
+  selectedAnswer: string;
   selectedBet: number | null;
   usedBets: number[];
   hasSubmitted: boolean;
@@ -65,6 +65,7 @@ export interface GameState {
   // Room state
   isHost: boolean;
   roomSettings: RoomSettings;
+  textHint: string | null;
 
   // Final results
   winner: {
@@ -88,7 +89,7 @@ export interface GameState {
  * Game state actions for handlers
  */
 export interface GameStateActions {
-  setSelectedAnswer: (answer: number | null) => void;
+  setSelectedAnswer: (answer: string) => void;
   setSelectedBet: (bet: number | null) => void;
   setGamePhase: (phase: GamePhase) => void;
   setTimeLeft: (time: number) => void;

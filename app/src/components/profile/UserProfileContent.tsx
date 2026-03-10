@@ -11,8 +11,8 @@ import { RecentGameItem } from "./RecentGameItem";
 import { colors } from "@/themes";
 import type { DisplayData } from "./UserProfileHeader";
 
-/** Blue used for the "Friends" stat card — no direct theme equivalent */
-const STAT_COLOR_FRIENDS = "#3B82F6";
+/** Blue used for the "Friends" stat card */
+const STAT_COLOR_FRIENDS = colors.accent.blue;
 
 interface UserProfileContentProps {
   displayData: DisplayData;

@@ -38,7 +38,7 @@ export function useGameState(config: UseGameStateOptions = {}) {
   const [gamePhase, setGamePhase] = useState<GamePhase>("waiting");
 
   // Player answer state
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState("");
   const [selectedBet, setSelectedBet] = useState<number | null>(null);
   const [usedBets, setUsedBets] = useState<number[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -52,6 +52,9 @@ export function useGameState(config: UseGameStateOptions = {}) {
 
   // Host state
   const [isHost] = useState(initialIsHost);
+
+  // Pack hint
+  const [textHint, setTextHint] = useState<string | null>(null);
 
   // Final results
   const [winner, setWinner] = useState<GameState["winner"]>(null);
@@ -134,6 +137,10 @@ export function useGameState(config: UseGameStateOptions = {}) {
 
     // Host state
     isHost,
+
+    // Pack hint
+    textHint,
+    setTextHint,
 
     // Final results
     winner,

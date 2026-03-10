@@ -325,4 +325,15 @@ export const authService = {
     }
     return response;
   },
+
+  /**
+   * Remove phone number from authenticated user
+   */
+  async removePhoneNumber(): Promise<ApiResponse<User>> {
+    const response = await api.delete<User>('/auth/phone');
+    if (response.data) {
+      await storage.setUser(response.data);
+    }
+    return response;
+  },
 };

@@ -32,7 +32,7 @@ mock.module('../../config/database', () => ({
   prisma: mockPrisma,
 }));
 
-mock.module('../../services/notificationService', () => ({
+mock.module('../../modules/social/notificationService', () => ({
   default: mockNotificationService,
 }));
 
@@ -42,8 +42,8 @@ mock.module('../../socket', () => ({
 }));
 
 // Import AFTER mocks are set up
-import { FriendRequestService } from '../../services/friendRequestService';
-import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '../../utils/errors';
+import { FriendRequestService } from '../../modules/social/friendRequestService';
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '../../shared/utils/errors';
 
 // --- Test Data ---
 

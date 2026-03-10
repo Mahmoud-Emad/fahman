@@ -10,8 +10,8 @@ import { colors, withOpacity } from "@/themes";
 import type { Notification, NotificationAction } from "./types";
 import { formatMessageTime } from "./types";
 
-/** Blue used for friend_request notification accent — no direct theme equivalent */
-const FRIEND_REQUEST_COLOR = "#3B82F6";
+/** Blue used for friend_request notification accent */
+const FRIEND_REQUEST_COLOR = colors.accent.blue;
 
 interface NotificationItemProps {
   notification: Notification;

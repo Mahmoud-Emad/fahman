@@ -46,7 +46,13 @@ run-app: ## Run the mobile app (Expo)
 	@echo "$(GREEN)Starting mobile app...$(NC)"
 	@cd app && npx expo start --clear
 
-run-back: ## Run the backend server
+run-back: ## Run the backend server (migrate + generate + seed + start)
+	@echo "$(CYAN)Running database migrations...$(NC)"
+	@cd backend && bunx prisma migrate dev
+	@echo "$(CYAN)Generating Prisma client...$(NC)"
+	@cd backend && bunx prisma generate
+	@echo "$(CYAN)Seeding database...$(NC)"
+	@cd backend && bun run seed
 	@echo "$(GREEN)Starting backend server...$(NC)"
 	@cd backend && bun run dev
 

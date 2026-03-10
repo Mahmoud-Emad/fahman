@@ -87,7 +87,7 @@ export function AvatarPreviewModal({ visible, avatar, userName, currentAvatarUrl
   return (
     <RNModal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View className="flex-1 items-center justify-center" pointerEvents="box-none">
-        <Animated.View pointerEvents="auto" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.7)", opacity: opacityAnim }}>
+        <Animated.View pointerEvents="auto" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: withOpacity(colors.black, 0.7), opacity: opacityAnim }}>
           <Pressable className="flex-1" onPress={onClose} />
         </Animated.View>
 

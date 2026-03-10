@@ -1,20 +1,20 @@
 /**
  * Chat Socket Event Handlers
+ * Uses Redis for typing status tracking
  */
 
 import { Server } from 'socket.io';
 import { prisma } from '../../config/database';
+import { getRedis } from '../../config/redis';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
   ServerToClientEvents,
   ChatMessage,
 } from '../types';
-import logger from '../../utils/logger';
+import logger from '../../shared/utils/logger';
 
-// Track typing status (userId -> roomId -> timestamp)
-const typingUsers: Map<string, Map<string, number>> = new Map();
-const TYPING_TIMEOUT = 3000; // 3 seconds
+const TYPING_TTL = 3; // 3 seconds
 
 export function registerChatHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -81,11 +81,11 @@ export function registerChatHandlers(
       io.to(roomId).emit('chat:message', chatMessage);
 
       // Clear typing status
-      clearTypingStatus(socket.userId, roomId);
+      await clearTypingStatus(socket.userId, roomId);
 
       logger.debug(`Chat message in room ${roomId} from ${socket.username}`);
-    } catch (error: any) {
-      logger.error(`Error sending chat message: ${error.message}`);
+    } catch (error) {
+      logger.error(`Error sending chat message: ${error instanceof Error ? error.message : error}`);
       socket.emit('error', { message: 'Failed to send message' });
     }
   });
@@ -93,9 +93,8 @@ export function registerChatHandlers(
   /**
    * User is typing
    */
-  socket.on('chat:typing', ({ roomId }) => {
-    // Set typing status
-    setTypingStatus(socket.userId, roomId);
+  socket.on('chat:typing', async ({ roomId }) => {
+    await setTypingStatus(socket.userId, roomId);
 
     // Notify others in the room
     socket.to(roomId).emit('chat:typing', {
@@ -104,27 +103,14 @@ export function registerChatHandlers(
       username: socket.username,
     });
 
-    // Auto-clear after timeout
-    setTimeout(() => {
-      const userTyping = typingUsers.get(socket.userId);
-      if (userTyping) {
-        const timestamp = userTyping.get(roomId);
-        if (timestamp && Date.now() - timestamp >= TYPING_TIMEOUT) {
-          clearTypingStatus(socket.userId, roomId);
-          socket.to(roomId).emit('chat:stopTyping', {
-            roomId,
-            userId: socket.userId,
-          });
-        }
-      }
-    }, TYPING_TIMEOUT);
+    // Redis TTL handles auto-cleanup — no setTimeout needed
   });
 
   /**
    * User stopped typing
    */
-  socket.on('chat:stopTyping', ({ roomId }) => {
-    clearTypingStatus(socket.userId, roomId);
+  socket.on('chat:stopTyping', async ({ roomId }) => {
+    await clearTypingStatus(socket.userId, roomId);
     socket.to(roomId).emit('chat:stopTyping', {
       roomId,
       userId: socket.userId,
@@ -133,26 +119,19 @@ export function registerChatHandlers(
 }
 
 /**
- * Set typing status
+ * Set typing status in Redis with TTL
  */
-function setTypingStatus(userId: string, roomId: string): void {
-  if (!typingUsers.has(userId)) {
-    typingUsers.set(userId, new Map());
-  }
-  typingUsers.get(userId)!.set(roomId, Date.now());
+async function setTypingStatus(userId: string, roomId: string): Promise<void> {
+  const redis = getRedis();
+  await redis.set(`typing:room:${roomId}:${userId}`, '1', 'EX', TYPING_TTL);
 }
 
 /**
  * Clear typing status
  */
-function clearTypingStatus(userId: string, roomId: string): void {
-  const userTyping = typingUsers.get(userId);
-  if (userTyping) {
-    userTyping.delete(roomId);
-    if (userTyping.size === 0) {
-      typingUsers.delete(userId);
-    }
-  }
+async function clearTypingStatus(userId: string, roomId: string): Promise<void> {
+  const redis = getRedis();
+  await redis.del(`typing:room:${roomId}:${userId}`);
 }
 
 /**
@@ -166,7 +145,7 @@ export async function broadcastSystemMessage(
   // Save system message to database
   const savedMessage = await prisma.message.create({
     data: {
-      senderId: 'system', // Need a system user or handle differently
+      senderId: 'system',
       roomId,
       text,
       messageType: 'SYSTEM',
@@ -189,7 +168,16 @@ export async function broadcastSystemMessage(
 
 /**
  * Clean up typing status when user disconnects
+ * Scans and removes all typing keys for the user
  */
-export function cleanupUserTyping(userId: string): void {
-  typingUsers.delete(userId);
+export async function cleanupUserTyping(userId: string): Promise<void> {
+  try {
+    const redis = getRedis();
+    const keys = await redis.keys(`typing:room:*:${userId}`);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
+  } catch {
+    // Best effort cleanup
+  }
 }

@@ -7,7 +7,7 @@ import {
   successResponse,
   errorResponse,
   paginatedResponse,
-} from '../../utils/responseFormatter';
+} from '../../shared/utils/responseFormatter';
 
 describe('Response Formatter', () => {
   describe('successResponse', () => {

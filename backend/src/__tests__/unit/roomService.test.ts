@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { NotFoundError, ForbiddenError, ValidationError } from '../../utils/errors';
+import { NotFoundError, ForbiddenError, ValidationError } from '../../shared/utils/errors';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -133,12 +133,12 @@ mock.module('../../socket', () => ({
 // Mock hashPassword
 const mockHashPassword = mock(() => Promise.resolve('hashed-password-123'));
 
-mock.module('../../utils/passwordUtils', () => ({
+mock.module('../../shared/utils/passwordUtils', () => ({
   hashPassword: mockHashPassword,
 }));
 
 // Import after mocking so the module picks up the mocked dependencies
-import { RoomService } from '../../services/roomService';
+import { RoomService } from '../../modules/room/roomService';
 
 // ---------------------------------------------------------------------------
 // Tests

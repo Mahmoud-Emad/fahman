@@ -12,10 +12,16 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
+export interface ApiFieldError {
+  field: string;
+  message: string;
+}
+
 export interface ApiError {
   message: string;
   status: number;
-  errors?: Record<string, string>;
+  errors?: ApiFieldError[];
+  fieldErrors?: Record<string, string>;
 }
 
 class ApiClient {
@@ -44,10 +50,22 @@ class ApiClient {
     const data = await response.json();
 
     if (!response.ok) {
+      // Build field-level error map from validation details
+      let fieldErrors: Record<string, string> | undefined;
+      if (Array.isArray(data.errors)) {
+        fieldErrors = {};
+        for (const err of data.errors) {
+          if (err.field && err.message) {
+            fieldErrors[err.field] = err.message;
+          }
+        }
+      }
+
       const error: ApiError = {
         message: data.message || 'An error occurred',
         status: response.status,
         errors: data.errors,
+        fieldErrors,
       };
       throw error;
     }
@@ -102,7 +120,7 @@ class ApiClient {
    * Check if the backend server is reachable
    * Returns true if connected, false otherwise
    */
-  async checkHealth(timeoutMs: number = 5000): Promise<{ connected: boolean; error?: string }> {
+  async checkHealth(timeoutMs: number = 5000): Promise<{ connected: boolean; version?: string; error?: string }> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -116,7 +134,11 @@ class ApiClient {
         },
       });
       clearTimeout(timeoutId);
-      return { connected: response.ok };
+      if (response.ok) {
+        const data = await response.json();
+        return { connected: true, version: data.version };
+      }
+      return { connected: false };
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {

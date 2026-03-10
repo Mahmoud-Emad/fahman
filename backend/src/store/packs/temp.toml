@@ -1,0 +1,50 @@
+[pack-info]
+name = ""
+description = ""
+version = ""
+author = "Fahman"
+cover = ""
+text-hint = ""
+price = 0
+preview-questions = 0
+number-of-questions = 10
+
+[question1]
+question = ""
+answer = ""
+
+[question2]
+question = ""
+answer = ""
+
+[question3]
+question = ""
+answer = ""
+
+[question4]
+question = ""
+answer = ""
+
+[question5]
+question = ""
+answer = ""
+
+[question6]
+question = ""
+answer = ""
+
+[question7]
+question = ""
+answer = ""
+
+[question8]
+question = ""
+answer = ""
+
+[question9]
+question = ""
+answer = ""
+
+[question10]
+question = ""
+answer = ""

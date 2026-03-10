@@ -2,14 +2,15 @@
  * LobbyView - Main lobby view with podium and chat
  */
 import React, { useState, useRef, useEffect } from "react";
-import { View, Pressable, TextInput, ScrollView, type ScrollView as ScrollViewType } from "react-native";
-import { Text, Icon } from "@/components/ui";
+import { View, Pressable, ScrollView, type ScrollView as ScrollViewType } from "react-native";
+import { Text, Icon, EmptyState } from "@/components/ui";
+import { MessageInput } from "@/components/messaging/MessageInput";
 import { colors } from "@/themes";
 import type { Player, ChatMessage } from "./types";
 import { PodiumView } from "./PodiumView";
-import { PlayersModal } from "./PlayersModal";
+import { PlayersModal } from "@/components/lists";
 import { PlayerActionDialog } from "./PlayerActionDialog";
-import { ChatBubble } from "./ChatBubble";
+import { ChatBubble } from "@/components/chat";
 
 interface LobbyViewProps {
   players: Player[];
@@ -31,7 +32,6 @@ export function LobbyView({
   showChat,
   onPlayerAction,
 }: LobbyViewProps) {
-  const [chatInput, setChatInput] = useState("");
   const [showAllPlayers, setShowAllPlayers] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const chatScrollRef = useRef<ScrollViewType>(null);
@@ -44,12 +44,6 @@ export function LobbyView({
       }, 100);
     }
   }, [messages]);
-
-  const handleSend = () => {
-    if (!chatInput.trim()) return;
-    onSendMessage(chatInput.trim());
-    setChatInput("");
-  };
 
   // Sort players by score and get top 3
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
@@ -119,18 +113,26 @@ export function LobbyView({
               }}
             >
               {messages.length === 0 ? (
-                <View className="items-center justify-center py-4">
-                  <Icon name="chatbubble-outline" size="lg" color={colors.neutral[300]} />
-                  <Text variant="caption" color="muted" className="mt-1">
-                    No messages yet
-                  </Text>
-                </View>
+                <EmptyState
+                  icon="chatbubble-outline"
+                  title="No messages yet"
+                  className="py-4"
+                />
               ) : (
                 messages.map((message) => (
                   <ChatBubble
                     key={message.id}
-                    message={message}
-                    isOwn={message.senderId === currentUserId}
+                    isCurrentUser={message.senderId === currentUserId}
+                    type={message.type === "system" ? "system" : "text"}
+                    text={message.message}
+                    senderName={message.senderName}
+                    senderInitials={message.senderInitials}
+                    senderAvatar={message.senderAvatar}
+                    timestamp={message.timestamp}
+                    systemVariant={message.systemVariant}
+                    showAvatar
+                    showSenderName
+                    variant="room"
                   />
                 ))
               )}
@@ -138,34 +140,7 @@ export function LobbyView({
           </View>
 
           {/* Chat Input */}
-          <View className="flex-row items-center gap-2">
-            <TextInput
-              value={chatInput}
-              onChangeText={setChatInput}
-              placeholder="Type a message..."
-              placeholderTextColor={colors.neutral[400]}
-              className="flex-1 rounded-xl px-4 py-2.5"
-              style={{
-                backgroundColor: colors.neutral[100],
-                fontSize: 14,
-                color: colors.text.primary,
-              }}
-            />
-            <Pressable
-              onPress={handleSend}
-              disabled={!chatInput.trim()}
-              className="w-10 h-10 rounded-full items-center justify-center active:scale-95"
-              style={{
-                backgroundColor: chatInput.trim() ? colors.primary[500] : colors.neutral[200],
-              }}
-            >
-              <Icon
-                name="chevron-forward"
-                customSize={18}
-                color={chatInput.trim() ? colors.white : colors.neutral[400]}
-              />
-            </Pressable>
-          </View>
+          <MessageInput onSend={onSendMessage} />
         </View>
       )}
 
@@ -174,7 +149,10 @@ export function LobbyView({
         visible={showAllPlayers}
         onClose={() => setShowAllPlayers(false)}
         players={sortedPlayers}
+        currentUserId={currentUserId}
+        hostId=""
         onPlayerAction={onPlayerAction}
+        onInvite={() => {}}
       />
 
       {/* Player Action Dialog */}

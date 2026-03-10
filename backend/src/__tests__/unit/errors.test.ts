@@ -11,7 +11,7 @@ import {
   NotFoundError,
   ConflictError,
   InternalServerError,
-} from '../../utils/errors';
+} from '../../shared/utils/errors';
 
 describe('Custom Error Classes', () => {
   describe('AppError', () => {

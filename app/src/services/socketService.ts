@@ -31,6 +31,7 @@ export interface GameStartedData {
   roomId: string;
   totalQuestions: number;
   packTitle: string;
+  textHint: string | null;
 }
 
 export interface QuestionData {
@@ -432,7 +433,7 @@ class SocketService {
   /**
    * Submit answer for current question
    */
-  submitAnswer(roomId: string, answer: number | number[], betAmount: number, timeRemaining: number): void {
+  submitAnswer(roomId: string, answer: string, betAmount: number, timeRemaining: number): void {
     this.socket?.emit('game:answer', { roomId, answer, betAmount, timeRemaining });
   }
 
