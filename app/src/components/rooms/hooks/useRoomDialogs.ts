@@ -7,6 +7,7 @@ import type { StackNavigationProp } from "@react-navigation/stack";
 import type { RoomData } from "../types";
 import { roomsService } from "@/services/roomsService";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import type { RootStackParamList } from "../../../../App";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "Rooms">;
@@ -150,14 +151,15 @@ export function useRoomDialogs(): UseRoomDialogsReturn {
             toast.error("Incorrect password. Please try again.");
           }
         }
-      } catch (error: any) {
-        if (error.message?.includes("not found")) {
+      } catch (error) {
+        const message = getErrorMessage(error);
+        if (message.includes("not found")) {
           toast.error("Room not found. Check the code and try again.");
-        } else if (error.message?.includes("password") || error.message?.includes("incorrect")) {
+        } else if (message.includes("password") || message.includes("incorrect")) {
           toast.error("Incorrect password. Please try again.");
-        } else if (error.message?.includes("full")) {
+        } else if (message.includes("full")) {
           toast.error("This room is full.");
-        } else if (error.message?.includes("already")) {
+        } else if (message.includes("already")) {
           // Already a member, just navigate
           setJoinModalVisible(false);
           if (pendingRoomCode) {
@@ -168,7 +170,7 @@ export function useRoomDialogs(): UseRoomDialogsReturn {
           }
           return;
         } else {
-          toast.error(error.message || "Failed to join room. Please try again.");
+          toast.error(message);
         }
       } finally {
         setIsJoining(false);

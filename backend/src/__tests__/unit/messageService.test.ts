@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { AppError } from '../../shared/utils/errors';
+import { AppError } from '@shared/utils/errors';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -71,7 +71,7 @@ mock.module('../../config/database', () => ({
 }));
 
 // Import after mocking so the module picks up the mocked prisma
-import messageService from '../../modules/social/messageService';
+import messageService from '@modules/social/messageService';
 
 // ---------------------------------------------------------------------------
 // Tests

@@ -2,7 +2,7 @@
  * HomeScreen - Main landing page
  * Features: Logo, Join/Host buttons, navigation bars
  */
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { View, Image, BackHandler, Modal as RNModal, Pressable, Animated } from "react-native";
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
@@ -15,9 +15,11 @@ import type { PackData } from "@/components/packs/types";
 import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
 import { ChatDetailsModal, NotificationsModal, ChatsListModal } from "@/components/messaging";
 import { MarketplaceModal } from "@/components/marketplace";
-import { useMessaging, useFriends, useAuth, usePacks } from "@/hooks";
-import { useToast } from "@/contexts";
+import { useMessaging, useAuth, usePacks } from "@/hooks";
+import { useToast, useFriendsContext } from "@/contexts";
 import { storeService } from "@/services/storeService";
+import type { PurchasePlatform } from "@/components/common/BuyCoinsModal";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { colors, withOpacity } from "@/themes";
 import { UI_TIMING } from "@/constants";
 import type { RootStackParamList } from "../../App";
@@ -156,6 +158,7 @@ export function HomeScreen() {
   const [exitDialogVisible, setExitDialogVisible] = useState(false);
   const [helpVisible, setHelpVisible] = useState(false);
   const [localCoins, setLocalCoins] = useState(user?.coins ?? 0);
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   // Handle hardware back button
   useFocusEffect(
@@ -172,7 +175,7 @@ export function HomeScreen() {
 
   // Use centralized hooks
   const messaging = useMessaging();
-  const friendsHook = useFriends();
+  const friendsHook = useFriendsContext();
   const packsHook = usePacks();
 
   // Sync local coins with user
@@ -180,36 +183,38 @@ export function HomeScreen() {
     setLocalCoins(user?.coins ?? 0);
   }, [user?.coins]);
 
-  const handleCoinsPurchased = async (packageId: string) => {
+  const handleCoinsPurchased = useCallback(async (packageId: string, receiptToken: string, platform: PurchasePlatform) => {
+    if (isPurchasing) return;
+    setIsPurchasing(true);
     try {
-      const response = await storeService.purchaseCoins(packageId);
+      const response = await storeService.purchaseCoins({ packageId, receiptToken, platform });
 
       if (response.success && response.data) {
-        // Optimistic update
         setLocalCoins(response.data.newBalance);
-
-        // Sync with auth context
         await refreshUser();
-
         toast.success(`${response.data.coinsAdded} coins added!`);
         setBuyCoinsVisible(false);
       } else {
         toast.error(response.message || "Purchase failed");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to purchase coins");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setIsPurchasing(false);
     }
-  };
+  }, [isPurchasing, refreshUser, toast]);
 
-  const handleCoinsUpdated = (newBalance: number) => {
+  const handleCoinsUpdated = useCallback((newBalance: number) => {
     setLocalCoins(newBalance);
-  };
+  }, []);
 
   // Fetch packs when modal opens
   useEffect(() => {
     if (packModalVisible) {
       packsHook.fetchPacks();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // packsHook.fetchPacks is stable (from usePacks hook) — only trigger on modal visibility
   }, [packModalVisible]);
 
   // Coordinate friend press with chat opening
@@ -224,6 +229,9 @@ export function HomeScreen() {
         avatar: friend.avatar,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only react to pendingChatFriend changes; messaging.openDirectChat and
+    // friendsHook.clearPendingChatFriend are stable callbacks from hooks/contexts.
   }, [friendsHook.pendingChatFriend]);
 
   // Handle openChatWith route param (from UserProfileScreen)
@@ -234,9 +242,11 @@ export function HomeScreen() {
       navigation.setParams({ openChatWith: undefined });
       messaging.openDirectChat(chatWith);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Only react to route param changes; navigation and messaging are stable references.
   }, [route.params?.openChatWith]);
 
-  const handleTabPress = (tabId: string) => {
+  const handleTabPress = useCallback((tabId: string) => {
     if (tabId === "rooms") {
       navigation.navigate("Rooms");
     } else if (tabId === "friends") {
@@ -248,27 +258,32 @@ export function HomeScreen() {
     } else if (tabId === "profile") {
       navigation.navigate("Profile");
     }
-  };
+  }, [navigation, friendsHook, messaging]);
 
-  const handleJoinRoom = () => {
+  const handleJoinRoom = useCallback(() => {
     navigation.navigate("Rooms");
-  };
+  }, [navigation]);
 
-  const handleHostRoom = () => {
+  const handleHostRoom = useCallback(() => {
     setPackModalVisible(true);
-  };
+  }, []);
 
-  const handlePackSelected = (pack: PackData) => {
+  const handlePackSelected = useCallback((pack: PackData) => {
     navigation.navigate("RoomConfig", { pack });
-  };
+  }, [navigation]);
 
-  const handleCreatePack = () => {
+  const handleCreatePack = useCallback(() => {
     navigation.navigate("PackCreation", {});
-  };
+  }, [navigation]);
 
-  const handleSettingsPress = () => {
+  const handleSettingsPress = useCallback(() => {
     navigation.navigate("Settings");
-  };
+  }, [navigation]);
+
+  const bottomNavBadges = useMemo(() => ({
+    notifications: messaging.unreadNotificationCount,
+    chats: messaging.unreadMessageCount,
+  }), [messaging.unreadNotificationCount, messaging.unreadMessageCount]);
 
   return (
     <View className="flex-1 bg-background">
@@ -387,10 +402,7 @@ export function HomeScreen() {
         centerTab={{ id: "rooms", label: "Rooms", icon: "game-controller-outline", activeIcon: "game-controller" }}
         activeTab="rooms"
         onTabPress={handleTabPress}
-        badges={{
-          notifications: messaging.unreadNotificationCount,
-          chats: messaging.unreadMessageCount,
-        }}
+        badges={bottomNavBadges}
       />
 
       {/* Create Options Modal */}
@@ -410,6 +422,7 @@ export function HomeScreen() {
         suggestedPacks={packsHook.suggestedPacks}
         ownedPacks={packsHook.ownedPacks}
         popularPacks={packsHook.popularPacks}
+        freeStorePacks={packsHook.freeStorePacks}
         isLoading={packsHook.isLoading}
       />
 
@@ -453,8 +466,8 @@ export function HomeScreen() {
         onAvatarSelect={async (avatarUrl) => {
           try {
             await updateProfile({ avatar: avatarUrl });
-          } catch (error: any) {
-            toast.error(error.message || "Failed to update avatar");
+          } catch (error) {
+            toast.error(getErrorMessage(error));
           }
         }}
       />

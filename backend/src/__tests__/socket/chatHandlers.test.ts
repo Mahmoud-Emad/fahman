@@ -76,7 +76,7 @@ import {
   registerChatHandlers,
   broadcastSystemMessage,
   cleanupUserTyping,
-} from '../../socket/handlers/chatHandlers';
+} from '@/socket/handlers/chatHandlers';
 
 // ---------------------------------------------------------------------------
 // Socket/IO mock helpers

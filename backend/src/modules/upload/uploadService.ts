@@ -6,7 +6,8 @@
 import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { config } from '../../config/env';
+import { config } from '@config/env';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
 // Upload directory paths
 const UPLOADS_DIR = join(__dirname, '../uploads');
@@ -104,7 +105,7 @@ class UploadService {
       return { success: true, url, filename };
     } catch (error) {
       console.error('Error uploading pack image:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to upload image' };
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -132,7 +133,7 @@ class UploadService {
       return { success: true, url, filename };
     } catch (error) {
       console.error('Error uploading pack image:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to upload image' };
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 

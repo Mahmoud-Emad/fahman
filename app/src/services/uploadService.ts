@@ -5,6 +5,7 @@
 
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { api, ApiResponse } from './api';
+import { getErrorMessage } from '@/utils/errorUtils';
 import { transformUrl as sharedTransformUrl } from '@/utils/transformUrl';
 
 export interface UploadResponse {
@@ -53,10 +54,10 @@ class UploadService {
         image: base64,
         mimeType,
       });
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        message: error.message || 'Failed to upload image',
+        message: getErrorMessage(error),
       };
     }
   }

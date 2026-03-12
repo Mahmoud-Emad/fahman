@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { View } from "react-native";
-import { Modal, Text, Icon, Button } from "@/components/ui";
+import { Modal, Text, Icon, Button, type IconName } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 
 interface CoinsModalProps {
@@ -13,7 +13,7 @@ interface CoinsModalProps {
 }
 
 interface FeatureItemProps {
-  icon: string;
+  icon: IconName;
   title: string;
   description: string;
 }
@@ -25,7 +25,7 @@ function FeatureItem({ icon, title, description }: FeatureItemProps) {
         className="w-10 h-10 rounded-full items-center justify-center mr-3"
         style={{ backgroundColor: withOpacity(colors.primary[500], 0.1) }}
       >
-        <Icon name={icon as any} size="sm" color={colors.primary[500]} />
+        <Icon name={icon} size="sm" color={colors.primary[500]} />
       </View>
       <View className="flex-1">
         <Text variant="body-sm" className="font-semibold">

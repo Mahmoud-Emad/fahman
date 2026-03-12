@@ -112,7 +112,7 @@ model User {
   // Phone authentication
   phoneNumber              String?   @unique @map("phone_number") @db.VarChar(20)
   phoneVerified            Boolean   @default(false) @map("phone_verified")
-  phoneVerificationCode    String?   @map("phone_verification_code") @db.VarChar(6)
+  phoneVerificationCode    String?   @map("phone_verification_code") @db.VarChar(72) /// Stores bcrypt hash of the OTP code
   phoneVerificationExpiry  DateTime? @map("phone_verification_expiry") @db.Timestamptz(6)
 
   // OAuth authentication
@@ -143,6 +143,7 @@ model User {
   sentMessages      Message[]      @relation("SentMessages")
   receivedMessages  Message[]      @relation("ReceivedMessages")
   purchases         PackPurchase[]
+  avatarPurchases   AvatarPurchase[]
   transactions      Transaction[]  @relation("BuyerTransactions")
   sales             Transaction[]  @relation("SellerTransactions")
   wonGames          GameSession[]
@@ -333,17 +334,19 @@ model Transaction {
   id                   String            @id @default(uuid())
   buyerId              String            @map("buyer_id")
   sellerId             String?           @map("seller_id")
-  packId               String            @map("pack_id")
+  packId               String?           @map("pack_id")
   amount               Decimal           @db.Decimal(10, 2)
   status               TransactionStatus @default(PENDING)
   paymentMethod        String?           @map("payment_method") @db.VarChar(50)
   transactionReference String?           @unique @map("transaction_reference") @db.VarChar(255)
+  receiptToken         String?           @unique @map("receipt_token")
+  platform             String?           @db.VarChar(10)
   createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   completedAt          DateTime?         @map("completed_at") @db.Timestamptz(6)
 
   buyer     User           @relation("BuyerTransactions", fields: [buyerId], references: [id], onDelete: Cascade)
   seller    User?          @relation("SellerTransactions", fields: [sellerId], references: [id], onDelete: SetNull)
-  pack      Pack           @relation(fields: [packId], references: [id], onDelete: Cascade)
+  pack      Pack?          @relation(fields: [packId], references: [id], onDelete: Cascade)
   purchases PackPurchase[]
 
   @@index([buyerId])
@@ -369,6 +372,20 @@ model PackPurchase {
   @@index([userId])
   @@index([packId])
   @@map("pack_purchases")
+}
+
+model AvatarPurchase {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  albumId     String   @map("album_id") @db.VarChar(100)
+  price       Int      @default(0)
+  purchasedAt DateTime @default(now()) @map("purchased_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, albumId])
+  @@index([userId])
+  @@map("avatar_purchases")
 }
 
 model GameSession {

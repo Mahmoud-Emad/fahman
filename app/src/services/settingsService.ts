@@ -4,6 +4,7 @@
  */
 
 import { api, ApiResponse } from './api';
+import { getErrorMessage } from '@/utils/errorUtils';
 
 export interface UserSettings {
   id: string;
@@ -45,11 +46,11 @@ class SettingsService {
   async getSettings(): Promise<ApiResponse<UserSettings>> {
     try {
       return await api.get<UserSettings>('/settings');
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        message: error.message || 'Failed to get settings',
-        error: error.message,
+        message: getErrorMessage(error),
+        error: getErrorMessage(error),
       };
     }
   }
@@ -60,11 +61,11 @@ class SettingsService {
   async updateSettings(data: UpdateSettingsData): Promise<ApiResponse<UserSettings>> {
     try {
       return await api.put<UserSettings>('/settings', data);
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        message: error.message || 'Failed to update settings',
-        error: error.message,
+        message: getErrorMessage(error),
+        error: getErrorMessage(error),
       };
     }
   }
@@ -75,26 +76,26 @@ class SettingsService {
   async resetSettings(): Promise<ApiResponse<UserSettings>> {
     try {
       return await api.post<UserSettings>('/settings/reset');
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        message: error.message || 'Failed to reset settings',
-        error: error.message,
+        message: getErrorMessage(error),
+        error: getErrorMessage(error),
       };
     }
   }
 
   /**
-   * Delete user account
+   * Delete user account (requires password confirmation)
    */
-  async deleteAccount(): Promise<ApiResponse<void>> {
+  async deleteAccount(password?: string): Promise<ApiResponse<void>> {
     try {
-      return await api.delete<void>('/settings/delete-account');
-    } catch (error: any) {
+      return await api.delete<void>('/settings/delete-account', password ? { password } : undefined);
+    } catch (error) {
       return {
         success: false,
-        message: error.message || 'Failed to delete account',
-        error: error.message,
+        message: getErrorMessage(error),
+        error: getErrorMessage(error),
       };
     }
   }

@@ -23,10 +23,8 @@ const mockPrisma = {
 const mockNotificationService = {
   createFriendRequestNotification: mock(() => Promise.resolve(null)),
   createFriendAcceptedNotification: mock(() => Promise.resolve(null)),
+  resolveByContext: mock(() => Promise.resolve(null)),
 };
-
-const mockSendNotificationToUser = mock(() => {});
-const mockEmitFriendshipAccepted = mock(() => {});
 
 mock.module('../../config/database', () => ({
   prisma: mockPrisma,
@@ -36,14 +34,9 @@ mock.module('../../modules/social/notificationService', () => ({
   default: mockNotificationService,
 }));
 
-mock.module('../../socket', () => ({
-  sendNotificationToUser: mockSendNotificationToUser,
-  emitFriendshipAccepted: mockEmitFriendshipAccepted,
-}));
-
 // Import AFTER mocks are set up
-import { FriendRequestService } from '../../modules/social/friendRequestService';
-import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '../../shared/utils/errors';
+import { FriendRequestService } from '@modules/social/friendRequestService';
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '@shared/utils/errors';
 
 // --- Test Data ---
 
@@ -103,8 +96,7 @@ describe('FriendRequestService', () => {
     mockPrisma.friendship.delete.mockReset();
     mockNotificationService.createFriendRequestNotification.mockReset();
     mockNotificationService.createFriendAcceptedNotification.mockReset();
-    mockSendNotificationToUser.mockReset();
-    mockEmitFriendshipAccepted.mockReset();
+    mockNotificationService.resolveByContext.mockReset();
   });
 
   // =========================================================================
@@ -194,7 +186,7 @@ describe('FriendRequestService', () => {
       const result = await service.sendFriendRequest(USER_1_ID, USER_2_ID);
 
       expect(result).toHaveProperty('friendship');
-      expect(result.friendship.status).toBe('ACCEPTED');
+      expect((result as any).friendship.status).toBe('ACCEPTED');
     });
 
     it('should throw ForbiddenError when the friendship is blocked', async () => {
@@ -241,7 +233,7 @@ describe('FriendRequestService', () => {
       expect(mockPrisma.friendship.update).toHaveBeenCalled();
     });
 
-    it('should send notification when re-sending a previously rejected request', async () => {
+    it('should return notification when re-sending a previously rejected request', async () => {
       mockPrisma.user.findUnique.mockResolvedValueOnce(mockUser2);
       mockPrisma.friendship.findFirst.mockResolvedValueOnce({
         id: REQUEST_ID,
@@ -262,14 +254,14 @@ describe('FriendRequestService', () => {
       const mockNotification = { id: 'notif-1', type: 'FRIEND_REQUEST' };
       mockNotificationService.createFriendRequestNotification.mockResolvedValueOnce(mockNotification);
 
-      await service.sendFriendRequest(USER_1_ID, USER_2_ID);
+      const result = await service.sendFriendRequest(USER_1_ID, USER_2_ID);
 
       expect(mockNotificationService.createFriendRequestNotification).toHaveBeenCalledWith(
         USER_2_ID,
         USER_1_ID,
         REQUEST_ID
       );
-      expect(mockSendNotificationToUser).toHaveBeenCalledWith(USER_2_ID, mockNotification);
+      expect(result.notification).toEqual(mockNotification);
     });
 
     it('should create a new friend request when no existing friendship exists', async () => {
@@ -305,7 +297,7 @@ describe('FriendRequestService', () => {
       });
     });
 
-    it('should send notification to target user when creating a new request', async () => {
+    it('should return notification for target user when creating a new request', async () => {
       mockPrisma.user.findUnique.mockResolvedValueOnce(mockUser2);
       mockPrisma.friendship.findFirst.mockResolvedValueOnce(null);
 
@@ -321,17 +313,17 @@ describe('FriendRequestService', () => {
       const mockNotification = { id: 'notif-1', type: 'FRIEND_REQUEST' };
       mockNotificationService.createFriendRequestNotification.mockResolvedValueOnce(mockNotification);
 
-      await service.sendFriendRequest(USER_1_ID, USER_2_ID);
+      const result = await service.sendFriendRequest(USER_1_ID, USER_2_ID);
 
       expect(mockNotificationService.createFriendRequestNotification).toHaveBeenCalledWith(
         USER_2_ID,
         USER_1_ID,
         REQUEST_ID
       );
-      expect(mockSendNotificationToUser).toHaveBeenCalledWith(USER_2_ID, mockNotification);
+      expect(result.notification).toEqual(mockNotification);
     });
 
-    it('should not send socket notification when notificationService returns null', async () => {
+    it('should return null notification when notificationService returns null', async () => {
       mockPrisma.user.findUnique.mockResolvedValueOnce(mockUser2);
       mockPrisma.friendship.findFirst.mockResolvedValueOnce(null);
 
@@ -345,9 +337,9 @@ describe('FriendRequestService', () => {
       mockPrisma.friendship.create.mockResolvedValueOnce(createdRequest);
       mockNotificationService.createFriendRequestNotification.mockResolvedValueOnce(null);
 
-      await service.sendFriendRequest(USER_1_ID, USER_2_ID);
+      const result = await service.sendFriendRequest(USER_1_ID, USER_2_ID);
 
-      expect(mockSendNotificationToUser).not.toHaveBeenCalled();
+      expect(result.notification).toBeNull();
     });
   });
 
@@ -514,6 +506,7 @@ describe('FriendRequestService', () => {
 
       expect(result).toHaveProperty('friendship');
       expect(result.friendship.status).toBe('ACCEPTED');
+      expect(result).toHaveProperty('requesterId', USER_1_ID);
       expect(mockPrisma.friendship.update).toHaveBeenCalledWith({
         where: { id: REQUEST_ID },
         data: {
@@ -527,7 +520,7 @@ describe('FriendRequestService', () => {
       });
     });
 
-    it('should send friend accepted notification to the original requester', async () => {
+    it('should return notification for the original requester', async () => {
       mockPrisma.friendship.findUnique.mockResolvedValueOnce({
         id: REQUEST_ID,
         userId: USER_1_ID,
@@ -548,16 +541,17 @@ describe('FriendRequestService', () => {
       const mockNotification = { id: 'notif-accept', type: 'FRIEND_ACCEPTED' };
       mockNotificationService.createFriendAcceptedNotification.mockResolvedValueOnce(mockNotification);
 
-      await service.acceptFriendRequest(USER_2_ID, REQUEST_ID);
+      const result = await service.acceptFriendRequest(USER_2_ID, REQUEST_ID);
 
       expect(mockNotificationService.createFriendAcceptedNotification).toHaveBeenCalledWith(
         USER_1_ID,
         USER_2_ID
       );
-      expect(mockSendNotificationToUser).toHaveBeenCalledWith(USER_1_ID, mockNotification);
+      expect(result.notification).toEqual(mockNotification);
+      expect(result.requesterId).toBe(USER_1_ID);
     });
 
-    it('should emit friendship accepted socket event to both users', async () => {
+    it('should return requesterId for controller to emit friendship accepted', async () => {
       mockPrisma.friendship.findUnique.mockResolvedValueOnce({
         id: REQUEST_ID,
         userId: USER_1_ID,
@@ -576,12 +570,12 @@ describe('FriendRequestService', () => {
       });
       mockNotificationService.createFriendAcceptedNotification.mockResolvedValueOnce(null);
 
-      await service.acceptFriendRequest(USER_2_ID, REQUEST_ID);
+      const result = await service.acceptFriendRequest(USER_2_ID, REQUEST_ID);
 
-      expect(mockEmitFriendshipAccepted).toHaveBeenCalledWith(USER_1_ID, USER_2_ID);
+      expect(result.requesterId).toBe(USER_1_ID);
     });
 
-    it('should not send socket notification when notificationService returns null', async () => {
+    it('should return null notification when notificationService returns null', async () => {
       mockPrisma.friendship.findUnique.mockResolvedValueOnce({
         id: REQUEST_ID,
         userId: USER_1_ID,
@@ -600,9 +594,9 @@ describe('FriendRequestService', () => {
       });
       mockNotificationService.createFriendAcceptedNotification.mockResolvedValueOnce(null);
 
-      await service.acceptFriendRequest(USER_2_ID, REQUEST_ID);
+      const result = await service.acceptFriendRequest(USER_2_ID, REQUEST_ID);
 
-      expect(mockSendNotificationToUser).not.toHaveBeenCalled();
+      expect(result.notification).toBeNull();
     });
   });
 
@@ -668,7 +662,8 @@ describe('FriendRequestService', () => {
 
       const result = await service.declineFriendRequest(USER_2_ID, REQUEST_ID);
 
-      expect(result).toEqual({ success: true });
+      expect(result.success).toBe(true);
+      expect(result).toHaveProperty('resolved');
       expect(mockPrisma.friendship.update).toHaveBeenCalledWith({
         where: { id: REQUEST_ID },
         data: {

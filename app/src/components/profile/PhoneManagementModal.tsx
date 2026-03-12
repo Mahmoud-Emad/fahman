@@ -6,6 +6,7 @@ import { View, TextInput, ActivityIndicator, Alert } from "react-native";
 import { Text, Icon, Modal, Button } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import { useAuth } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 interface PhoneManagementModalProps {
   visible: boolean;
@@ -78,8 +79,8 @@ export function PhoneManagementModal({
       }
 
       setStep("verify");
-    } catch (err: any) {
-      setError(err.message || "Failed to update phone number");
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -99,8 +100,8 @@ export function PhoneManagementModal({
       onPhoneUpdated();
       Alert.alert("Success", "Phone number verified successfully");
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Invalid verification code");
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -119,8 +120,8 @@ export function PhoneManagementModal({
       } else {
         Alert.alert("Code Sent", "A new verification code has been sent to your phone");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to resend code");
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -142,8 +143,8 @@ export function PhoneManagementModal({
               onPhoneUpdated();
               Alert.alert("Success", "Phone number removed successfully");
               onClose();
-            } catch (err: any) {
-              setError(err.message || "Failed to remove phone number");
+            } catch (err) {
+              setError(getErrorMessage(err));
             } finally {
               setLoading(false);
             }

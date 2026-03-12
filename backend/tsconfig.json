@@ -7,6 +7,13 @@
     /* Modules */
     "module": "ESNext",
     "rootDir": "./src",
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"],
+      "@shared/*": ["./shared/*"],
+      "@modules/*": ["./modules/*"],
+      "@config/*": ["./config/*"]
+    },
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "types": ["bun-types"],

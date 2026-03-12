@@ -108,7 +108,6 @@ export interface GameState {
 export interface SubmitAnswerData {
   answer: number | number[];
   betAmount: number;
-  timeRemaining: number;
 }
 
 export interface AnswerResult {

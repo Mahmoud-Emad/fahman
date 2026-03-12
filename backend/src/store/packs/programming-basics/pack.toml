@@ -1,0 +1,78 @@
+[pack-info]
+# Pack ID (UUID)
+id = "47c648fb-7211-4f4d-880e-7bf29441cc56"
+
+# Pack name
+name = "Programming Basics"
+
+# Pack description
+description = "Test your knowledge of programming fundamentals and famous technologies."
+
+# Pack version
+version = "1.0.0"
+
+# Pack author
+author = "Fahman"
+
+# Pack cover
+cover = "./media/cover.png"
+
+# Pack text hint, this hint will be displayed on bottom of every pack question.
+text-hint = ""
+
+# Pack price
+price = 0
+
+# Pack preview questions
+preview-questions = 3
+
+# Pack number of questions
+number-of-questions = 10
+
+# Pack category
+category = "technology"
+
+# Pack is free
+free = true
+
+# Pack questions
+[question1]
+question = "Which programming language is known for its snake logo?"
+# Pack question can have one or more answers
+answers = ["Python", "python"]
+
+[question2]
+question = "Which programming language is mainly used to style web pages?"
+answers = ["CSS", "css"]
+
+[question3]
+question = "Which programming language runs in the browser and powers interactive websites?"
+answers = ["JavaScript", "javascript"]
+
+[question4]
+question = "What does HTML stand for?"
+answers = ["HyperText Markup Language", "html"]
+
+[question5]
+question = "Which version control system is most commonly used by developers?"
+answers = ["Git", "git"]
+
+[question6]
+question = "Which platform is most popular for hosting Git repositories?"
+answers = ["GitHub", "github"]
+
+[question7]
+question = "Which programming language was created by Guido van Rossum?"
+answers = ["Python", "python"]
+
+[question8]
+question = "Which keyword is used to define a function in Python?"
+answers = ["def", "Def"]
+
+[question9]
+question = "Which company created the Go programming language?"
+answers = ["Google", "google"]
+
+[question10]
+question = "What symbol is commonly used to comment a single line in Python?"
+answers = ["#"]

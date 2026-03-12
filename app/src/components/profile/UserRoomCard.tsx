@@ -14,6 +14,7 @@ export interface UserRoomData {
   title: string;
   code: string;
   description: string | null;
+  creatorId: string;
   isPublic: boolean;
   maxPlayers: number;
   currentPlayers: number;

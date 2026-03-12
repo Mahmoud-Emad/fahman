@@ -24,35 +24,25 @@ help: ## Print this help message
 	@echo "  $(YELLOW)make help$(NC)       Print this help message"
 	@echo ""
 
-configure: ## Detect machine IP and configure API endpoints
+configure: ## Detect machine IP and update app/src/config/env.ts
 	@IP=$(get_ip); \
 	if [ "$$IP" = "localhost" ]; then \
 		echo "$(YELLOW)Warning: Could not detect network IP, using localhost$(NC)"; \
 	else \
 		echo "$(GREEN)Detected IP: $$IP$(NC)"; \
 	fi; \
-	if [ -f app/.env ]; then \
-		if grep -q "^API_URL=" app/.env; then \
-			sed -i.bak "s|^API_URL=.*|API_URL=http://$$IP:3000/api|" app/.env && rm -f app/.env.bak; \
-		else \
-			echo "API_URL=http://$$IP:3000/api" >> app/.env; \
-		fi; \
-	else \
-		echo "API_URL=http://$$IP:3000/api" > app/.env; \
-	fi; \
-	echo "$(GREEN)Configured app/.env with API_URL=http://$$IP:3000/api$(NC)"
+	sed -i.bak "s|const DEV_SERVER_IP = '.*'|const DEV_SERVER_IP = '$$IP'|" app/src/config/env.ts && rm -f app/src/config/env.ts.bak; \
+	echo "$(GREEN)Updated app/src/config/env.ts → DEV_SERVER_IP = '$$IP'$(NC)"
 
 run-app: ## Run the mobile app (Expo)
 	@echo "$(GREEN)Starting mobile app...$(NC)"
 	@cd app && npx expo start --clear
 
-run-back: ## Run the backend server (migrate + generate + seed + start)
+run-back: ## Run the backend server (migrate + generate + start)
 	@echo "$(CYAN)Running database migrations...$(NC)"
 	@cd backend && bunx prisma migrate dev
 	@echo "$(CYAN)Generating Prisma client...$(NC)"
 	@cd backend && bunx prisma generate
-	@echo "$(CYAN)Seeding database...$(NC)"
-	@cd backend && bun run seed
 	@echo "$(GREEN)Starting backend server...$(NC)"
 	@cd backend && bun run dev
 

@@ -3,7 +3,7 @@
  * Batch-fetches user statistics in a single SQL query for achievement evaluation.
  */
 
-import { prisma } from '../../config/database';
+import { prisma } from '@config/database';
 import type { UserStats } from './achievementEngine';
 
 interface StatsRow {

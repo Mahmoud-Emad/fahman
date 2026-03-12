@@ -4,15 +4,19 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../../config/database';
-import { hashPassword, comparePassword } from '../../shared/utils/passwordUtils';
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../../shared/utils/tokenUtils';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { UnauthorizedError, ConflictError } from '../../shared/utils/errors';
-import logger from '../../shared/utils/logger';
-import { AuthRequest } from '../../shared/types/index';
+import { prisma } from '@config/database';
+import { getRedis } from '@config/redis';
+import { hashPassword, comparePassword } from '@shared/utils/passwordUtils';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, extractTokenFromHeader, verifyToken } from '@shared/utils/tokenUtils';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { UnauthorizedError, ConflictError } from '@shared/utils/errors';
+import logger from '@shared/utils/logger';
+import { AuthRequest } from '@shared/types/index';
 import { StreakService } from '../user/streakService';
 import { generateUniqueUsername, getUserResponse, createAuthResponse } from './authService';
+import { invalidateUserCache } from '@shared/middleware/auth';
+
+const REFRESH_TOKEN_TTL = 2592000; // 30 days in seconds
 
 // =============================================================================
 // REGISTRATION
@@ -31,30 +35,33 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     }
 
     const passwordHash = await hashPassword(password);
-    const tempUsername = `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-    const user = await prisma.user.create({
-      data: {
-        username: tempUsername,
-        email,
-        passwordHash,
-        displayName,
-        avatar: avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`,
-        authProvider: 'LOCAL',
-        lastLogin: new Date(),
-      },
-    });
+    // Use interactive transaction so the row is rolled back if username generation fails
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const tempUsername = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const user = await tx.user.create({
+        data: {
+          username: tempUsername,
+          email,
+          passwordHash,
+          displayName,
+          avatar: avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`,
+          authProvider: 'LOCAL',
+          lastLogin: new Date(),
+        },
+      });
 
-    const username = await generateUniqueUsername(displayName, user.gameId);
+      const username = await generateUniqueUsername(displayName, user.gameId);
 
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id },
-      data: { username },
+      return tx.user.update({
+        where: { id: user.id },
+        data: { username },
+      });
     });
 
     logger.info(`New user registered: ${updatedUser.username} (${updatedUser.email}) - Game ID: ${updatedUser.gameId}`);
 
-    res.status(201).json(createAuthResponse(updatedUser, 'User registered successfully', true));
+    res.status(201).json(await createAuthResponse(updatedUser, 'User registered successfully', true));
   } catch (error) {
     next(error);
   }
@@ -144,11 +151,14 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       throw new UnauthorizedError('Invalid email or password');
     }
 
-    await StreakService.updateStreak(user.id);
+    await Promise.all([
+      StreakService.updateStreak(user.id),
+      prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }),
+    ]);
 
     logger.info(`User logged in: ${user.username}`);
 
-    res.json(createAuthResponse(user, 'Login successful'));
+    res.json(await createAuthResponse(user, 'Login successful'));
   } catch (error) {
     next(error);
   }
@@ -185,11 +195,14 @@ export async function loginWithPhone(req: Request, res: Response, next: NextFunc
       throw new UnauthorizedError('Invalid phone number or password');
     }
 
-    await StreakService.updateStreak(user.id);
+    await Promise.all([
+      StreakService.updateStreak(user.id),
+      prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }),
+    ]);
 
     logger.info(`User logged in with phone: ${user.username}`);
 
-    res.json(createAuthResponse(user, 'Login successful'));
+    res.json(await createAuthResponse(user, 'Login successful'));
   } catch (error) {
     next(error);
   }
@@ -226,11 +239,14 @@ export async function loginWithGameId(req: Request, res: Response, next: NextFun
       throw new UnauthorizedError('Invalid Game ID or password');
     }
 
-    await StreakService.updateStreak(user.id);
+    await Promise.all([
+      StreakService.updateStreak(user.id),
+      prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }),
+    ]);
 
     logger.info(`User logged in with Game ID: ${user.gameId} (${user.username})`);
 
-    res.json(createAuthResponse(user, 'Login successful'));
+    res.json(await createAuthResponse(user, 'Login successful'));
   } catch (error) {
     next(error);
   }
@@ -241,13 +257,19 @@ export async function loginWithGameId(req: Request, res: Response, next: NextFun
 // =============================================================================
 
 /**
- * Refresh access token
+ * Refresh access token (with token rotation)
+ * Verifies the old refresh token's jti exists in Redis, then issues new tokens
+ * and revokes the old one (single-use refresh tokens).
  */
 export async function refresh(req: Request, res: Response, next: NextFunction) {
   try {
     const { refreshToken } = req.body;
 
     const decoded = verifyRefreshToken(refreshToken);
+
+    if (!decoded.jti) {
+      throw new UnauthorizedError('Invalid refresh token');
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -258,8 +280,23 @@ export async function refresh(req: Request, res: Response, next: NextFunction) {
       throw new UnauthorizedError('Invalid refresh token');
     }
 
+    // Check that this refresh token hasn't been revoked
+    const redis = getRedis();
+    const oldKey = `refresh:token:${user.id}:${decoded.jti}`;
+    const isValid = await redis.get(oldKey);
+
+    if (!isValid) {
+      throw new UnauthorizedError('Token revoked');
+    }
+
+    // Rotate: delete old refresh token, issue new pair
     const newAccessToken = generateAccessToken({ userId: user.id, role: user.role });
-    const newRefreshToken = generateRefreshToken({ userId: user.id, role: user.role });
+    const { token: newRefreshToken, jti: newJti } = generateRefreshToken({ userId: user.id, role: user.role });
+
+    const pipeline = redis.pipeline();
+    pipeline.del(oldKey);
+    pipeline.set(`refresh:token:${user.id}:${newJti}`, 'valid', 'EX', REFRESH_TOKEN_TTL);
+    await pipeline.exec();
 
     res.json(
       successResponse(
@@ -294,9 +331,45 @@ export async function getCurrentUser(req: AuthRequest, res: Response, next: Next
 }
 
 /**
- * Logout
+ * Logout — blacklist current access token, revoke refresh token
  */
-export function logout(req: AuthRequest, res: Response) {
-  logger.info(`User logged out: ${req.user.username}`);
-  res.json(successResponse(null, 'Logout successful'));
+export async function logout(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const redis = getRedis();
+
+    // Blacklist the current access token for its remaining lifetime
+    const token = extractTokenFromHeader(req.headers.authorization);
+    if (token) {
+      try {
+        const decoded = verifyToken(token);
+        if (decoded.jti && decoded.exp) {
+          const remainingSeconds = decoded.exp - Math.floor(Date.now() / 1000);
+          if (remainingSeconds > 0) {
+            await redis.set(`blacklist:token:${decoded.jti}`, '1', 'EX', remainingSeconds);
+          }
+        }
+      } catch {
+        // Token already expired or invalid — no need to blacklist
+      }
+    }
+
+    // Revoke the refresh token if provided in the request body
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      try {
+        const decoded = verifyRefreshToken(refreshToken);
+        if (decoded.jti) {
+          await redis.del(`refresh:token:${req.user.id}:${decoded.jti}`);
+        }
+      } catch {
+        // Refresh token invalid/expired — already effectively revoked
+      }
+    }
+
+    await invalidateUserCache(req.user.id);
+    logger.info(`User logged out: ${req.user.username}`);
+    res.json(successResponse(null, 'Logout successful'));
+  } catch (error) {
+    next(error);
+  }
 }

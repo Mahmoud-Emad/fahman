@@ -18,7 +18,4 @@ export const submitAnswerSchema = Joi.object({
     'number.min': 'Bet amount cannot be negative',
     'any.required': 'Bet amount is required',
   }),
-  timeRemaining: Joi.number().min(0).required().messages({
-    'any.required': 'Time remaining is required',
-  }),
 });

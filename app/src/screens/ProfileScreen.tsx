@@ -11,18 +11,21 @@ import { Text, Icon, Avatar, Dialog, Skeleton } from "@/components/ui";
 import { BottomNavBar } from "@/components/navigation";
 import { NotificationsModal, ChatsListModal, ChatDetailsModal } from "@/components/messaging";
 import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
+import { MarketplaceModal } from "@/components/marketplace";
 import {
   EditProfileModal, PhoneManagementModal, AvatarSelectionModal,
   type UserPackData, ProfileStatsSection, ProfileAchievementsSection,
   ProfilePacksSection, ProfileGamesSection, type UserRoomData,
 } from "@/components/profile";
-import { useMessaging, useFriends } from "@/hooks";
-import { useAuth, useToast } from "@/contexts";
+import { AchievementsModal, type AchievementItem } from "@/components/profile/ProfileAchievementsSection";
+import { useMessaging } from "@/hooks";
+import { useAuth, useToast, useFriendsContext } from "@/contexts";
 import { packsService, type Pack } from "@/services/packsService";
 import { userService, type UserStats, type RecentGame, type Achievement } from "@/services/userService";
 import { roomsService, type Room } from "@/services/roomsService";
 import { transformUrl } from "@/utils/transformUrl";
 import { colors, withOpacity } from "@/themes";
+import { getErrorMessage } from "@/utils/errorUtils";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { RootStackParamList } from "../../App";
 
@@ -218,12 +221,14 @@ export function ProfileScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [phoneModalVisible, setPhoneModalVisible] = useState(false);
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [marketplaceVisible, setMarketplaceVisible] = useState(false);
   const [deletePackDialog, setDeletePackDialog] = useState<{ visible: boolean; pack: UserPackData | null }>({ visible: false, pack: null });
   const [deleteRoomDialog, setDeleteRoomDialog] = useState<{ visible: boolean; room: Room | null }>({ visible: false, room: null });
+  const [achievementsModalVisible, setAchievementsModalVisible] = useState(false);
 
   const [userPacks, setUserPacks] = useState<UserPackData[]>([]);
   const [packsLoading, setPacksLoading] = useState(true);
-  const [userRooms, setUserRooms] = useState<any[]>([]);
+  const [userRooms, setUserRooms] = useState<UserRoomData[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [recentGames, setRecentGames] = useState<RecentGame[]>([]);
@@ -241,7 +246,7 @@ export function ProfileScreen() {
   });
 
   const messaging = useMessaging();
-  const friendsHook = useFriends();
+  const friendsHook = useFriendsContext();
 
   useEffect(() => {
     if (friendsHook.pendingChatFriend) {
@@ -254,17 +259,34 @@ export function ProfileScreen() {
   const fetchUserPacks = useCallback(async () => {
     setPacksLoading(true);
     try {
-      const response = await packsService.getMyPacks();
-      if (response.success && response.data) {
-        setUserPacks(response.data.map((pack: Pack) => ({
-          id: pack.id, title: pack.title, description: pack.description,
-          imageUrl: transformImageUrl(pack.imageUrl),
-          questionsCount: pack._count?.questions || 0, timesPlayed: pack.timesPlayed,
-          visibility: pack.visibility, isPublished: pack.isPublished, createdAt: pack.createdAt,
-        })));
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to load packs");
+      const [myPacksRes, selectionRes] = await Promise.all([
+        packsService.getMyPacks(),
+        packsService.getPacksForSelection(),
+      ]);
+
+      const createdPacks: UserPackData[] = myPacksRes.success && myPacksRes.data
+        ? myPacksRes.data.map((pack: Pack) => ({
+            id: pack.id, title: pack.title, description: pack.description,
+            imageUrl: transformImageUrl(pack.imageUrl),
+            questionsCount: pack._count?.questions || 0, timesPlayed: pack.timesPlayed,
+            visibility: pack.visibility, isPublished: pack.isPublished, createdAt: pack.createdAt,
+            isEditable: true,
+          }))
+        : [];
+
+      const purchasedPacks: UserPackData[] = selectionRes.success && selectionRes.data?.ownedStorePacks
+        ? selectionRes.data.ownedStorePacks.map((p) => ({
+            id: p.id, title: p.name, description: p.description,
+            imageUrl: transformImageUrl(p.coverUrl),
+            questionsCount: p.numberOfQuestions, timesPlayed: 0,
+            visibility: "PUBLIC" as const, isPublished: true, createdAt: new Date().toISOString(),
+            isEditable: false,
+          }))
+        : [];
+
+      setUserPacks([...createdPacks, ...purchasedPacks]);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setPacksLoading(false);
     }
@@ -276,20 +298,33 @@ export function ProfileScreen() {
       const response = await roomsService.getMyRooms();
       if (response.success && response.data) {
         setUserRooms(response.data.map((room: any) => ({
-          ...room,
+          id: room.id,
+          title: room.title,
+          code: room.code,
+          description: room.description,
+          creatorId: room.creatorId ?? room.creator?.id,
+          isPublic: room.isPublic,
+          maxPlayers: room.maxPlayers,
+          currentPlayers: room.currentPlayers ?? room._count?.members ?? 0,
+          status: room.status,
           selectedPack: room.selectedPack
             ? { ...room.selectedPack, imageUrl: transformImageUrl(room.selectedPack.imageUrl) }
             : null,
         })));
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to load rooms");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setRoomsLoading(false);
     }
   }, []);
 
+  const lastFetchedAt = useRef<number>(0);
+
   useFocusEffect(useCallback(() => {
+    const now = Date.now();
+    if (now - lastFetchedAt.current < 30_000) return;
+    lastFetchedAt.current = now;
     fetchUserPacks();
     fetchUserRooms();
   }, [fetchUserPacks, fetchUserRooms]));
@@ -304,8 +339,8 @@ export function ProfileScreen() {
       if (statsResponse.success && statsResponse.data) setUserStats(statsResponse.data);
       if (gamesResponse.success && gamesResponse.data) setRecentGames(gamesResponse.data);
       if (achievementsResponse.success && achievementsResponse.data) setAchievements(achievementsResponse.data);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to load profile stats");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   }, []);
 
@@ -326,7 +361,10 @@ export function ProfileScreen() {
     setRefreshing(false);
   }, [refreshUser, fetchUserPacks, fetchUserRooms, fetchStatsData]);
 
-  const handlePackPress = (pack: UserPackData) => navigation.navigate("PackCreation", { packId: pack.id });
+  const handlePackPress = (pack: UserPackData) => {
+    if (pack.isEditable === false) return;
+    navigation.navigate("PackCreation", { packId: pack.id });
+  };
   const handlePackEdit = (pack: UserPackData) => navigation.navigate("PackCreation", { packId: pack.id });
   const handleCreatePack = () => navigation.navigate("PackCreation", {});
   const handlePackDelete = (pack: UserPackData) => setDeletePackDialog({ visible: true, pack });
@@ -337,12 +375,12 @@ export function ProfileScreen() {
       const response = await packsService.deletePack(deletePackDialog.pack.id);
       if (response.success) {
         toast.success("Pack deleted successfully");
-        setUserPacks((prev) => prev.filter((p) => p.id !== deletePackDialog.pack!.id));
+        setUserPacks((prev) => prev.filter((p) => p.id !== deletePackDialog.pack?.id));
       } else {
         toast.error(response.message || "Failed to delete pack");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete pack");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setDeletePackDialog({ visible: false, pack: null });
     }
@@ -350,7 +388,7 @@ export function ProfileScreen() {
 
   const handleRoomPress = (room: UserRoomData) => {
     navigation.navigate("RoomLobby", {
-      isHost: true,
+      isHost: room.creatorId === authUser?.id,
       pack: { id: room.selectedPack?.id || "", title: room.selectedPack?.title || "Unknown Pack", category: "General", difficulty: "MEDIUM" } as any,
       config: { maxPlayers: room.maxPlayers, questionsCount: 10, timerDuration: 20, maxBet: 10, isPrivate: !room.isPublic } as any,
       room: room as any,
@@ -365,12 +403,12 @@ export function ProfileScreen() {
       const response = await roomsService.deleteRoom(deleteRoomDialog.room.id);
       if (response.success) {
         toast.success("Room deleted successfully");
-        setUserRooms((prev) => prev.filter((r) => r.id !== deleteRoomDialog.room!.id));
+        setUserRooms((prev) => prev.filter((r) => r.id !== deleteRoomDialog.room?.id));
       } else {
         toast.error(response.message || "Failed to delete room");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete room");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setDeleteRoomDialog({ visible: false, room: null });
     }
@@ -389,11 +427,11 @@ export function ProfileScreen() {
     isPremium: authUser?.role === "ADMIN" || authUser?.role === "MODERATOR",
     joinDate: authUser?.createdAt ? formatJoinDate(authUser.createdAt) : "Unknown",
     stats: userStats
-      ? { gamesPlayed: userStats.gamesPlayed, wins: userStats.wins, winRate: userStats.winRate, friends: friendsHook.friends.length, currentStreak: userStats.currentStreak, bestStreak: userStats.bestStreak }
-      : { ...EMPTY_STATS, friends: friendsHook.friends.length },
-    achievements: achievements.map(a => ({ id: a.id, name: a.name, icon: "trophy" as any, color: colors.gold, earned: a.unlocked })),
+      ? { gamesPlayed: userStats.gamesPlayed, wins: userStats.wins, winRate: userStats.winRate, friends: userStats.friendsCount, currentStreak: userStats.currentStreak, bestStreak: userStats.bestStreak }
+      : EMPTY_STATS,
+    achievements: achievements.map(a => ({ id: a.id, name: a.name, description: a.description, icon: "trophy", color: colors.gold, earned: a.unlocked })),
     recentGames: recentGames.map(g => ({ id: g.id, packName: g.packTitle, result: g.result, score: g.score, date: new Date(g.playedAt).toLocaleDateString() })),
-  }), [authUser, userStats, achievements, recentGames, friendsHook.friends]);
+  }), [authUser, userStats, achievements, recentGames]);
 
   const isInitialLoading = statsLoading && packsLoading && roomsLoading;
 
@@ -407,16 +445,16 @@ export function ProfileScreen() {
       const deepLink = `fahman://add-friend?gameId=${displayData.gameId}`;
       const shareMessage = `Check out my Fahman profile!\n\n🎮 Game ID: ${displayData.gameId}\n\n👥 Tap to add me: ${deepLink}\n\nJoin me on Fahman!`;
       await Share.share({ message: shareMessage, title: "Add me on Fahman!" });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to share profile");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
   const handleSaveProfile = async (data: { displayName: string; bio: string }) => {
     try {
       await updateProfile({ displayName: data.displayName, bio: data.bio });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update profile");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
       throw error;
     }
   };
@@ -424,8 +462,8 @@ export function ProfileScreen() {
   const handleAvatarSelect = async (avatarUrl: string) => {
     try {
       await updateProfile({ avatar: avatarUrl });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update avatar");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -433,8 +471,8 @@ export function ProfileScreen() {
     try {
       await Clipboard.setStringAsync(displayData.gameId.toString());
       toast.success("Game ID copied to clipboard!");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to copy Game ID");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -528,7 +566,7 @@ export function ProfileScreen() {
               onPhoneManagement={() => setPhoneModalVisible(true)}
               onCopyGameId={handleCopyGameId}
             />
-            <ProfileAchievementsSection achievements={displayData.achievements} statsLoading={statsLoading} />
+            <ProfileAchievementsSection achievements={displayData.achievements} statsLoading={statsLoading} onViewAll={() => setAchievementsModalVisible(true)} />
             <ProfilePacksSection
               userPacks={userPacks} packsLoading={packsLoading}
               userRooms={userRooms} roomsLoading={roomsLoading}
@@ -546,7 +584,8 @@ export function ProfileScreen() {
       {/* Modals */}
       <EditProfileModal visible={editModalVisible} onClose={() => setEditModalVisible(false)} user={{ displayName: displayData.name, bio: displayData.bio, avatar: displayData.avatar }} onSave={handleSaveProfile} />
       <PhoneManagementModal visible={phoneModalVisible} onClose={() => setPhoneModalVisible(false)} phoneNumber={displayData.phoneNumber} phoneVerified={displayData.phoneVerified} onPhoneUpdated={refreshUser} />
-      <AvatarSelectionModal visible={avatarModalVisible} onClose={() => setAvatarModalVisible(false)} onSelect={handleAvatarSelect} currentAvatar={displayData.avatar} userCoins={authUser?.coins ?? 0} />
+      <AvatarSelectionModal visible={avatarModalVisible} onClose={() => setAvatarModalVisible(false)} onSelect={handleAvatarSelect} currentAvatar={displayData.avatar} onOpenShop={() => { setAvatarModalVisible(false); setTimeout(() => setMarketplaceVisible(true), 300); }} />
+      <MarketplaceModal visible={marketplaceVisible} onClose={() => setMarketplaceVisible(false)} userCoins={authUser?.coins ?? 0} currentAvatarUrl={displayData.avatar ?? undefined} />
 
       <NotificationsModal visible={messaging.notificationsVisible} onClose={() => messaging.setNotificationsVisible(false)} notifications={messaging.notifications} onNotificationPress={messaging.handleNotificationPress} onNotificationAction={messaging.handleNotificationAction} onMarkAllRead={messaging.handleMarkAllNotificationsRead} onDelete={messaging.handleDeleteNotification} onClearAll={messaging.handleClearReadNotifications} isLoading={messaging.notificationsLoading} />
       <ChatsListModal visible={messaging.chatsListVisible} onClose={() => messaging.setChatsListVisible(false)} conversations={messaging.conversations} onConversationPress={messaging.handleConversationPress} isLoading={messaging.chatsLoading} />
@@ -555,6 +594,8 @@ export function ProfileScreen() {
       <CreateGameDialog visible={!!friendsHook.playFriend} friend={friendsHook.playFriend} onClose={() => friendsHook.setPlayFriend(null)} />
       <FriendsListModal visible={friendsHook.friendsListVisible} onClose={() => friendsHook.setFriendsListVisible(false)} friends={friendsHook.friends} friendRequests={friendsHook.friendRequests} sentRequests={friendsHook.sentRequests} onFriendPress={friendsHook.handleFriendPress} onMessageFriend={friendsHook.handleMessageFriend} onInviteFriend={friendsHook.handleInviteFriend} onAcceptRequest={friendsHook.handleAcceptFriendRequest} onDeclineRequest={friendsHook.handleDeclineFriendRequest} onCancelRequest={friendsHook.handleCancelFriendRequest} onAddFriend={friendsHook.handleAddFriend} isLoading={friendsHook.friendsLoading} />
       <AddFriendModal visible={friendsHook.addFriendVisible} onClose={() => friendsHook.setAddFriendVisible(false)} onCloseAll={friendsHook.closeAllModals} onFriendAdded={friendsHook.handleFriendAdded} />
+
+      <AchievementsModal visible={achievementsModalVisible} onClose={() => setAchievementsModalVisible(false)} achievements={displayData.achievements} />
 
       <Dialog visible={deletePackDialog.visible} onClose={() => setDeletePackDialog({ visible: false, pack: null })} title="Delete Pack" message={`Are you sure you want to delete "${deletePackDialog.pack?.title}"? This action cannot be undone.`} confirmText="Delete" cancelText="Cancel" confirmVariant="danger" onConfirm={confirmPackDelete} onCancel={() => setDeletePackDialog({ visible: false, pack: null })} />
       <Dialog visible={deleteRoomDialog.visible} onClose={() => setDeleteRoomDialog({ visible: false, room: null })} title="Delete Room" message={`Are you sure you want to delete room "${deleteRoomDialog.room?.title}"? This action cannot be undone.`} confirmText="Delete" cancelText="Cancel" confirmVariant="danger" onConfirm={confirmRoomDelete} onCancel={() => setDeleteRoomDialog({ visible: false, room: null })} />

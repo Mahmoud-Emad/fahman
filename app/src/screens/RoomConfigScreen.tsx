@@ -3,7 +3,7 @@
  * Shows selected pack and room configuration options
  */
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, KeyboardAvoidingView, Platform, Pressable, Image } from "react-native";
+import { View, ScrollView, KeyboardAvoidingView, Platform, Pressable, Image, type ImageSourcePropType } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
@@ -13,10 +13,13 @@ import { colors, withOpacity } from "@/themes";
 import { ROOM_LIMITS } from "@/constants";
 import { usePacks } from "@/hooks";
 import { roomsService } from "@/services/roomsService";
-import { useToast } from "@/contexts";
+import { useToast, useAuth } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import type { ApiError } from "@/services/api";
 import type { RootStackParamList } from "../../App";
 import type { PackData, RoomConfigData, RoomConfigErrors } from "@/components/packs/types";
+
+const DEFAULT_PACK_LOGO: ImageSourcePropType = require("../../assets/icon.png");
 
 type RoomConfigNavigationProp = StackNavigationProp<RootStackParamList, "RoomConfig">;
 type RoomConfigRouteProp = RouteProp<RootStackParamList, "RoomConfig">;
@@ -30,6 +33,7 @@ export function RoomConfigScreen() {
   const route = useRoute<RoomConfigRouteProp>();
   const initialPack = route.params.pack;
   const toast = useToast();
+  const { user, refreshUser } = useAuth();
 
   // Selected pack state (can be changed via modal)
   const [selectedPack, setSelectedPack] = useState<PackData>(initialPack);
@@ -116,13 +120,14 @@ export function RoomConfigScreen() {
       const createdRoom = response.data;
 
       // Navigate to room lobby as host with room data
+      // Strip password from nav params to avoid leaking to state persistence
       navigation.replace("RoomLobby", {
         pack: selectedPack,
-        config,
+        config: { ...config, password: undefined },
         isHost: true,
         room: createdRoom,
       });
-    } catch (error: any) {
+    } catch (error) {
       const apiError = error as ApiError;
 
       // Map backend field validation errors to form fields
@@ -148,10 +153,10 @@ export function RoomConfigScreen() {
         if (hasFieldError) {
           setErrors(newErrors);
         } else {
-          toast.error(apiError.message || "Failed to create room");
+          toast.error(getErrorMessage(error));
         }
       } else {
-        toast.error(apiError.message || "Failed to create room");
+        toast.error(getErrorMessage(error));
       }
     } finally {
       setIsCreating(false);
@@ -222,29 +227,13 @@ export function RoomConfigScreen() {
               {/* Pack Logo */}
               <View
                 className="w-14 h-14 rounded-lg items-center justify-center overflow-hidden mr-4"
-                style={{
-                  backgroundColor: selectedPack.logoUri
-                    ? colors.white
-                    : withOpacity(colors.primary[500], 0.1),
-                }}
+                style={{ backgroundColor: colors.white }}
               >
-                {selectedPack.logoUri ? (
-                  <Image
-                    source={{ uri: selectedPack.logoUri }}
-                    style={{ width: 56, height: 56 }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <Text
-                    style={{
-                      fontSize: 20,
-                      fontWeight: "700",
-                      color: colors.primary[500],
-                    }}
-                  >
-                    {selectedPack.logoInitials || selectedPack.title.substring(0, 2).toUpperCase()}
-                  </Text>
-                )}
+                <Image
+                  source={selectedPack.logoUri ? { uri: selectedPack.logoUri } : DEFAULT_PACK_LOGO}
+                  style={{ width: 56, height: 56 }}
+                  resizeMode="cover"
+                />
               </View>
 
               {/* Pack Info */}
@@ -417,7 +406,12 @@ export function RoomConfigScreen() {
         suggestedPacks={packsHook.suggestedPacks}
         ownedPacks={packsHook.ownedPacks}
         popularPacks={packsHook.popularPacks}
+        freeStorePacks={packsHook.freeStorePacks}
+        paidStorePacks={packsHook.paidStorePacks}
         isLoading={packsHook.isLoading}
+        userCoins={user?.coins ?? 0}
+        onPackPurchased={() => { refreshUser(); packsHook.refreshPacks(); }}
+        onBuyCoins={() => { toast.info("Buy coins feature coming soon"); }}
       />
     </View>
   );

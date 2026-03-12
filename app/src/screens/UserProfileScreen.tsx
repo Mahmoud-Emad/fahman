@@ -11,6 +11,7 @@ import { userService, type UserStats, type RecentGame, type Achievement, type Pu
 import { friendsService } from "@/services/friendsService";
 import { socketService } from "@/services/socketService";
 import { useAuth, useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { transformUrl } from "@/utils/transformUrl";
 import { colors } from "@/themes";
 import { UserProfileHeader } from "@/components/profile/UserProfileHeader";
@@ -93,8 +94,8 @@ export function UserProfileScreen() {
           setProfile({ ...response.data, avatar: transformImageUrl(response.data.avatar) });
           setIsOnline(response.data.isOnline);
         }
-      } catch (error: any) {
-        toast.error(error.message || "Failed to load user profile");
+      } catch (error) {
+        toast.error(getErrorMessage(error));
       } finally {
         setProfileLoading(false);
       }
@@ -114,8 +115,8 @@ export function UserProfileScreen() {
         if (statsResponse.success && statsResponse.data) setUserStats(statsResponse.data);
         if (gamesResponse.success && gamesResponse.data) setRecentGames(gamesResponse.data);
         if (achievementsResponse.success && achievementsResponse.data) setAchievements(achievementsResponse.data);
-      } catch (error: any) {
-        toast.error(error.message || "Failed to load user stats");
+      } catch (error) {
+        toast.error(getErrorMessage(error));
       } finally {
         setStatsLoading(false);
       }
@@ -136,8 +137,8 @@ export function UserProfileScreen() {
       } else {
         toast.error(response.message || "Failed to send request");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send friend request");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setActionLoading(false);
     }
@@ -154,8 +155,8 @@ export function UserProfileScreen() {
       } else {
         toast.error(response.message || "Failed to cancel request");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to cancel request");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setActionLoading(false);
     }
@@ -172,8 +173,8 @@ export function UserProfileScreen() {
       } else {
         toast.error(response.message || "Failed to accept request");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to accept request");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setActionLoading(false);
     }
@@ -190,8 +191,8 @@ export function UserProfileScreen() {
       } else {
         toast.error(response.message || "Failed to remove friend");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to remove friend");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setActionLoading(false);
     }
@@ -203,8 +204,8 @@ export function UserProfileScreen() {
       const deepLink = `fahman://add-friend?gameId=${profile.gameId}`;
       const shareMessage = `Check out ${profile.displayName || profile.username}'s Fahman profile!\n\nGame ID: ${profile.gameId}\n\nTap to add them: ${deepLink}`;
       await Share.share({ message: shareMessage, title: `Add ${profile.displayName || profile.username} on Fahman!` });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to share profile");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -234,7 +235,7 @@ export function UserProfileScreen() {
       stats: userStats
         ? { gamesPlayed: userStats.gamesPlayed, wins: userStats.wins, winRate: userStats.winRate, friends: profile.friendsCount, currentStreak: userStats.currentStreak, bestStreak: userStats.bestStreak }
         : { gamesPlayed: 0, wins: 0, winRate: 0, friends: profile.friendsCount, currentStreak: 0, bestStreak: 0 },
-      achievements: achievements.map((a) => ({ id: a.id, name: a.name, icon: "trophy" as any, color: colors.gold, earned: a.unlocked })),
+      achievements: achievements.map((a) => ({ id: a.id, name: a.name, description: a.description, icon: "trophy", color: colors.gold, earned: a.unlocked })),
       recentGames: recentGames.map((g) => ({ id: g.id, packName: g.packTitle, result: g.result, score: g.score, date: new Date(g.playedAt).toLocaleDateString() })),
     };
   }, [profile, userStats, achievements, recentGames]);

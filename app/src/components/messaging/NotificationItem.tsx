@@ -2,10 +2,10 @@
  * NotificationItem - Single notification row component
  * Clean, minimal design matching app style
  */
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import { View, Animated } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
-import { Text, Icon, Avatar, Pressable } from "@/components/ui";
+import { Text, Icon, Avatar, Pressable, type IconName } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import type { Notification, NotificationAction } from "./types";
 import { formatMessageTime } from "./types";
@@ -23,7 +23,7 @@ interface NotificationItemProps {
 /**
  * Get icon for notification type (when no sender)
  */
-function getNotificationIcon(type: Notification["type"]): string {
+function getNotificationIcon(type: Notification["type"]): IconName {
   switch (type) {
     case "room_invite":
       return "game-controller";
@@ -93,17 +93,17 @@ function renderRightActions(
  * Status label shown after an action has been taken
  */
 function ActionTakenLabel({ action }: { action: string }) {
-  const labelMap: Record<string, { text: string; color: string; icon: string }> = {
+  const labelMap: Record<string, { text: string; color: string; icon: IconName }> = {
     accepted: { text: "Accepted", color: colors.success, icon: "checkmark-circle" },
     declined: { text: "Declined", color: colors.neutral[400], icon: "close-circle" },
-    joined: { text: "Joined", color: colors.primary[500], icon: "enter" },
+    joined: { text: "Joined", color: colors.primary[500], icon: "log-in" },
   };
 
-  const info = labelMap[action] || { text: action, color: colors.neutral[400], icon: "ellipse" };
+  const info = labelMap[action] || { text: action, color: colors.neutral[400], icon: "ellipsis-horizontal" };
 
   return (
     <View className="mt-2 flex-row items-center gap-1">
-      <Icon name={info.icon as any} customSize={14} color={info.color} />
+      <Icon name={info.icon} customSize={14} color={info.color} />
       <Text
         variant="caption"
         className="font-medium"
@@ -118,7 +118,7 @@ function ActionTakenLabel({ action }: { action: string }) {
 /**
  * NotificationItem component
  */
-export function NotificationItem({
+export const NotificationItem = memo(function NotificationItem({
   notification,
   onPress,
   onAction,
@@ -165,7 +165,7 @@ export function NotificationItem({
             className="w-11 h-11 rounded-full items-center justify-center"
             style={{ backgroundColor: withOpacity(accentColor, 0.1) }}
           >
-            <Icon name={iconName as any} size="md" color={accentColor} />
+            <Icon name={iconName} size="md" color={accentColor} />
           </View>
         )}
         {/* Unread indicator dot */}
@@ -278,4 +278,4 @@ export function NotificationItem({
   }
 
   return content;
-}
+});

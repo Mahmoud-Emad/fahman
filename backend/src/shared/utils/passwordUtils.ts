@@ -4,7 +4,7 @@
  */
 
 import bcrypt from 'bcrypt';
-import { config } from '../../config/env';
+import { config } from '@config/env';
 
 /**
  * Hash a plain text password

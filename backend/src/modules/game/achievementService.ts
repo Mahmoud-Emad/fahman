@@ -3,7 +3,7 @@
  * Handles achievement queries for the API layer.
  */
 
-import { prisma } from '../../config/database';
+import { prisma } from '@config/database';
 
 export interface AchievementResponse {
   id: string;

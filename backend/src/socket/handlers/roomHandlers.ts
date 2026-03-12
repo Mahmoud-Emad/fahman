@@ -3,14 +3,15 @@
  */
 
 import { Server } from 'socket.io';
-import { prisma } from '../../config/database';
+import { prisma } from '@config/database';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
   ServerToClientEvents,
   RoomMemberInfo,
 } from '../types';
-import logger from '../../shared/utils/logger';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
 export function registerRoomHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -75,7 +76,7 @@ export function registerRoomHandlers(
 
       logger.info(`${socket.username} joined room socket: ${roomId}`);
     } catch (error) {
-      logger.error(`Error joining room socket: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error joining room socket: ${getErrorMessage(error)}`);
       socket.emit('error', { message: 'Failed to join room' });
     }
   });
@@ -98,7 +99,7 @@ export function registerRoomHandlers(
 
       logger.info(`${socket.username} left room socket: ${roomId}`);
     } catch (error) {
-      logger.error(`Error leaving room socket: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error leaving room socket: ${getErrorMessage(error)}`);
     }
   });
 
@@ -107,6 +108,11 @@ export function registerRoomHandlers(
    */
   socket.on('room:ready', async ({ roomId, isReady }) => {
     try {
+      if (!socket.rooms.has(roomId)) {
+        socket.emit('error', { message: 'Not in room' });
+        return;
+      }
+
       // Update in database
       await prisma.roomMember.updateMany({
         where: {
@@ -126,7 +132,7 @@ export function registerRoomHandlers(
 
       logger.info(`${socket.username} set ready=${isReady} in room ${roomId}`);
     } catch (error) {
-      logger.error(`Error setting ready status: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error setting ready status: ${getErrorMessage(error)}`);
       socket.emit('error', { message: 'Failed to update ready status' });
     }
   });
@@ -157,22 +163,21 @@ export function broadcastRoomClosed(
 /**
  * Notify a specific user they were kicked
  */
-export function notifyPlayerKicked(
+export async function notifyPlayerKicked(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   roomId: string,
   userId: string,
   reason: string
-): void {
-  // Get sockets for this user
-  const sockets = io.sockets.sockets;
-  sockets.forEach((socket) => {
-    const authSocket = socket as AuthenticatedSocket;
-    if (authSocket.userId === userId) {
-      authSocket.emit('room:kicked', { roomId, reason });
-      authSocket.leave(roomId);
-      authSocket.roomIds?.delete(roomId);
-    }
-  });
+): Promise<void> {
+  // Emit kick event via user room
+  io.to(`user:${userId}`).emit('room:kicked', { roomId, reason });
+
+  // Remove the user's sockets from the game room
+  const sockets = await io.in(`user:${userId}`).fetchSockets();
+  for (const socket of sockets) {
+    socket.leave(roomId);
+    (socket as unknown as AuthenticatedSocket).roomIds?.delete(roomId);
+  }
 
   // Notify others
   io.to(roomId).emit('room:playerLeft', { roomId, playerId: userId });

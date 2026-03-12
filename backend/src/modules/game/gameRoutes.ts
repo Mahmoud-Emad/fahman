@@ -5,9 +5,9 @@
 
 import express from 'express';
 import * as gameController from './gameController';
-import { authenticate } from '../../shared/middleware/auth';
-import { validate, validateUUID } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { validate, validateUUID } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import { submitAnswerSchema } from './gameValidator';
 
 const router = express.Router({ mergeParams: true }); // Merge params from parent router
@@ -91,7 +91,6 @@ router.get('/', authenticate, asyncHandler(gameController.getGameState));
  *             required:
  *               - answer
  *               - betAmount
- *               - timeRemaining
  *             properties:
  *               answer:
  *                 oneOf:
@@ -105,9 +104,6 @@ router.get('/', authenticate, asyncHandler(gameController.getGameState));
  *                 type: integer
  *                 minimum: 0
  *                 description: Points to bet on this answer
- *               timeRemaining:
- *                 type: number
- *                 description: Seconds remaining when answer was submitted
  *     responses:
  *       200:
  *         description: Answer submitted

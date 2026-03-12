@@ -30,9 +30,12 @@ import {
   ChatDetailsModal,
 } from "@/components/messaging";
 import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
-import { useMessaging, useFriends, useAuth, usePacks } from "@/hooks";
+import { useMessaging, useAuth, usePacks } from "@/hooks";
+import { useFriendsContext } from "@/contexts";
 import { storeService } from "@/services/storeService";
+import { friendsService, type UserSearchResult } from "@/services/friendsService";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { colors } from "@/themes";
 import { transformUrl } from "@/utils/transformUrl";
 import type { RootStackParamList } from "../../App";
@@ -54,7 +57,7 @@ export function RoomsScreen() {
 
   // Use centralized hooks
   const messaging = useMessaging();
-  const friendsHook = useFriends();
+  const friendsHook = useFriendsContext();
   const packsHook = usePacks();
 
   // Sync local coins with user
@@ -76,9 +79,9 @@ export function RoomsScreen() {
     }
   }, [friendsHook.pendingChatFriend]);
 
-  const handleCoinsPurchased = async (packageId: string) => {
+  const handleCoinsPurchased = async (packageId: string, receiptToken: string, platform: 'ios' | 'android' | 'web') => {
     try {
-      const response = await storeService.purchaseCoins(packageId);
+      const response = await storeService.purchaseCoins({ packageId, receiptToken, platform });
 
       if (response.success && response.data) {
         setLocalCoins(response.data.newBalance);
@@ -88,8 +91,8 @@ export function RoomsScreen() {
       } else {
         toast.error(response.message || "Purchase failed");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to purchase coins");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -346,6 +349,7 @@ export function RoomsScreen() {
         suggestedPacks={packsHook.suggestedPacks}
         ownedPacks={packsHook.ownedPacks}
         popularPacks={packsHook.popularPacks}
+        freeStorePacks={packsHook.freeStorePacks}
         isLoading={packsHook.isLoading}
       />
 
@@ -429,6 +433,19 @@ export function RoomsScreen() {
         visible={searchModalVisible}
         onClose={() => setSearchModalVisible(false)}
         onRoomSelect={handleSearchRoomSelect}
+        onUserSelect={(user) => {
+          setSearchModalVisible(false);
+          setTimeout(() => navigation.navigate("UserProfile", { userId: user.id }), 300);
+        }}
+        onAddFriend={async (user) => {
+          try {
+            const res = await friendsService.sendFriendRequest(user.id);
+            if (res.success) toast.success(`Friend request sent to ${user.displayName || user.username}`);
+            else toast.error(res.message || "Failed to send request");
+          } catch (err) {
+            toast.error(getErrorMessage(err));
+          }
+        }}
       />
     </View>
   );

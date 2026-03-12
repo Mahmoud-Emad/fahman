@@ -4,8 +4,8 @@
  * and grants new achievements. Fully idempotent — safe to re-run.
  */
 
-import { prisma } from '../../config/database';
-import logger from '../../shared/utils/logger';
+import { prisma } from '@config/database';
+import logger from '@shared/utils/logger';
 import { evaluateCondition } from './achievementEngine';
 import { batchUserStats } from './achievementStatsQuery';
 

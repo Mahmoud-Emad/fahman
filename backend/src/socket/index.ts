@@ -14,18 +14,21 @@ import {
 } from './types';
 import { authenticateSocket } from './middleware';
 import { registerRoomHandlers } from './handlers/roomHandlers';
-import { registerGameHandlers } from './handlers/gameHandlers';
+import { registerGameHandlers, cleanupGameRoom } from './handlers/gameHandlers';
 import { registerChatHandlers, cleanupUserTyping } from './handlers/chatHandlers';
 import { registerDmHandlers, cleanupUserDmTyping } from './handlers/dmHandlers';
 import {
   trackUserOnline,
   trackUserOffline,
+  refreshPresence,
   getOnlineFriends,
   notifyFriendsOffline,
 } from './presenceHandlers';
 import { SocketRegistry } from './registry';
-import logger from '../shared/utils/logger';
-import { config } from '../config/env';
+import { prisma } from '@config/database';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
+import { config } from '@config/env';
 
 // The registry instance
 let registry: SocketRegistry | null = null;
@@ -38,7 +41,7 @@ export function initializeSocket(httpServer: HttpServer): SocketRegistry {
     httpServer,
     {
       cors: {
-        origin: config.cors.origin,
+        origin: config.cors.origins,
         methods: ['GET', 'POST'],
         credentials: true,
       },
@@ -63,8 +66,18 @@ export function initializeSocket(httpServer: HttpServer): SocketRegistry {
       username: authSocket.username,
     });
 
+    // Join user-specific room for O(1) targeted emits
+    authSocket.join(`user:${authSocket.userId}`);
+
     // Track online status
     trackUserOnline(io, authSocket.userId);
+
+    // Refresh presence TTL on every Socket.io heartbeat (~25s)
+    socket.conn.on('packet', (packet: { type: string }) => {
+      if (packet.type === 'pong') {
+        refreshPresence(authSocket.userId).catch(() => {});
+      }
+    });
 
     // Register event handlers
     registerRoomHandlers(io, authSocket);
@@ -78,7 +91,7 @@ export function initializeSocket(httpServer: HttpServer): SocketRegistry {
         const onlineFriends = await getOnlineFriends(authSocket.userId);
         authSocket.emit('friend:statusList', { online: onlineFriends });
       } catch (error) {
-        logger.error(`Error getting friend status: ${error instanceof Error ? error.message : error}`);
+        logger.error(`Error getting friend status: ${getErrorMessage(error)}`);
       }
     });
 
@@ -88,13 +101,29 @@ export function initializeSocket(httpServer: HttpServer): SocketRegistry {
 
       // Notify all rooms the user was in that they left
       const roomIds = Array.from(authSocket.roomIds || new Set());
-      if (roomIds.length > 0) {
-        roomIds.forEach((roomId) => {
-          io.to(roomId).emit('room:playerLeft', {
-            roomId,
-            playerId: authSocket.userId,
-          });
+      for (const roomId of roomIds) {
+        io.to(roomId).emit('room:playerLeft', {
+          roomId,
+          playerId: authSocket.userId,
         });
+
+        // If no active members remain, clean up game timers and close room
+        try {
+          const activeMembers = await prisma.roomMember.count({
+            where: { roomId, isActive: true },
+          });
+
+          if (activeMembers === 0) {
+            cleanupGameRoom(roomId);
+            await prisma.room.update({
+              where: { id: roomId },
+              data: { status: 'CLOSED' },
+            });
+            logger.info(`Room ${roomId} closed — all players disconnected`);
+          }
+        } catch (error) {
+          logger.error(`Error checking/closing room ${roomId}: ${getErrorMessage(error)}`);
+        }
       }
 
       // Clean up
@@ -121,80 +150,6 @@ export function initializeSocket(httpServer: HttpServer): SocketRegistry {
  */
 export function getSocketRegistry(): SocketRegistry | null {
   return registry;
-}
-
-// ---------------------------------------------------------------------------
-// Backward-compatible facade functions
-// These delegate to the registry. They will be removed in Phase 7 when
-// controllers access the registry via req.app.get('socketRegistry').
-// ---------------------------------------------------------------------------
-
-function getRegistry(): SocketRegistry {
-  if (!registry) {
-    logger.warn('Socket.io not initialized');
-    throw new Error('Socket.io not initialized');
-  }
-  return registry;
-}
-
-export function sendNotificationToUser(userId: string, notification: unknown): void {
-  try { getRegistry().sendNotificationToUser(userId, notification); } catch {}
-}
-
-export function sendNotificationUpdate(userId: string, data: { id: string; actionTaken: string }): void {
-  try { getRegistry().sendNotificationUpdate(userId, data); } catch {}
-}
-
-export function emitRoomClosed(roomId: string, reason: string): void {
-  try { getRegistry().emitRoomClosed(roomId, reason); } catch {}
-}
-
-export function emitRoomListUpdate(roomId: string, currentPlayers: number, status: string): void {
-  try { getRegistry().emitRoomListUpdate(roomId, currentPlayers, status); } catch {}
-}
-
-export function emitPlayerLeft(roomId: string, userId: string): void {
-  try { getRegistry().emitPlayerLeft(roomId, userId); } catch {}
-}
-
-export function emitPlayerKicked(roomId: string, userId: string, reason: string): void {
-  try { getRegistry().emitPlayerKicked(roomId, userId, reason); } catch {}
-}
-
-export function emitGameStarted(roomId: string): void {
-  try { getRegistry().emitGameStarted(roomId); } catch {}
-}
-
-export function emitDmMessage(recipientId: string, message: unknown): void {
-  try { getRegistry().emitDmMessage(recipientId, message as any); } catch {}
-}
-
-export function emitPlayerJoined(roomId: string, player: {
-  id: string;
-  username: string;
-  displayName: string | null;
-  avatar: string | null;
-  score: number;
-  isReady: boolean;
-  role: string;
-}): void {
-  try { getRegistry().emitPlayerJoined(roomId, player); } catch {}
-}
-
-export function emitRoomUpdated(roomId: string, updates: unknown): void {
-  try { getRegistry().emitRoomUpdated(roomId, updates as any); } catch {}
-}
-
-export function emitPlayerReady(roomId: string, playerId: string, isReady: boolean): void {
-  try { getRegistry().emitPlayerReady(roomId, playerId, isReady); } catch {}
-}
-
-export async function emitFriendshipAccepted(userId: string, friendId: string): Promise<void> {
-  try { await getRegistry().emitFriendshipAccepted(userId, friendId); } catch {}
-}
-
-export async function isUserOnline(userId: string): Promise<boolean> {
-  try { return await getRegistry().isUserOnline(userId); } catch { return false; }
 }
 
 // Re-export handler utilities for external use

@@ -3,11 +3,10 @@
  * Business logic for room membership operations (join, leave, kick, ready)
  */
 
-import { prisma } from '../../config/database';
-import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '../../shared/utils/errors';
-import { comparePassword } from '../../shared/utils/passwordUtils';
-import { emitPlayerJoined, emitRoomUpdated, emitPlayerReady } from '../../socket';
-import roomService from './roomService';
+import { prisma } from '@config/database';
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '@shared/utils/errors';
+import { comparePassword } from '@shared/utils/passwordUtils';
+import roomCoreService from './roomCoreService';
 
 export class RoomMembersService {
   /**
@@ -32,12 +31,11 @@ export class RoomMembersService {
       throw new ConflictError('You are already in this room');
     }
 
-    // Check room status
+    // Check room status (early exit before password check / DB write)
     if (room.status !== 'WAITING') {
       throw new ValidationError('Room is not accepting new players');
     }
 
-    // Check if room is full
     if (room.currentPlayers >= room.maxPlayers) {
       throw new ValidationError('Room is full');
     }
@@ -53,9 +51,23 @@ export class RoomMembersService {
       }
     }
 
-    // Add member to room (upsert handles rejoining after a previous leave)
-    const [member] = await prisma.$transaction([
-      prisma.roomMember.upsert({
+    // Atomic: increment currentPlayers only if room is still WAITING and not full.
+    // This eliminates the TOCTOU race between the check above and the write below.
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.room.updateMany({
+        where: {
+          id: roomId,
+          status: 'WAITING',
+          currentPlayers: { lt: room.maxPlayers },
+        },
+        data: { currentPlayers: { increment: 1 } },
+      });
+
+      if (updated.count === 0) {
+        throw new ValidationError('Room is full or no longer accepting players');
+      }
+
+      const member = await tx.roomMember.upsert({
         where: { roomId_userId: { roomId, userId } },
         create: {
           roomId,
@@ -74,28 +86,14 @@ export class RoomMembersService {
             select: { id: true, username: true, displayName: true, avatar: true },
           },
         },
-      }),
-      prisma.room.update({
-        where: { id: roomId },
-        data: { currentPlayers: { increment: 1 } },
-      }),
-    ]);
+      });
 
-    const updatedRoom = await roomService.getRoomById(roomId);
-
-    // Emit socket event to notify other players
-    emitPlayerJoined(roomId, {
-      id: member.user.id,
-      username: member.user.username,
-      displayName: member.user.displayName,
-      avatar: member.user.avatar,
-      score: member.score,
-      isReady: member.isReady,
-      role: member.role,
+      return member;
     });
 
-    // Emit room updated event with new player count
-    emitRoomUpdated(roomId, { currentPlayers: room.currentPlayers + 1 });
+    const member = result;
+
+    const updatedRoom = await roomCoreService.getRoomById(roomId);
 
     return { room: updatedRoom, member };
   }
@@ -233,9 +231,71 @@ export class RoomMembersService {
       },
     });
 
-    emitPlayerReady(roomId, userId, isReady);
-
     return updatedMember;
+  }
+
+  /**
+   * Start the game
+   */
+  async startGame(userId: string, roomId: string) {
+    const room = await prisma.room.findUnique({
+      where: { id: roomId },
+      include: {
+        members: { where: { isActive: true } },
+        selectedPack: {
+          include: { _count: { select: { questions: true } } },
+        },
+      },
+    });
+
+    if (!room) {
+      throw new NotFoundError('Room not found');
+    }
+
+    if (room.creatorId !== userId) {
+      throw new ForbiddenError('Only the room creator can start the game');
+    }
+
+    if (room.status !== 'WAITING') {
+      throw new ValidationError('Game has already started or room is closed');
+    }
+
+    if (room.members.length < 2) {
+      throw new ValidationError('At least 2 players are required to start');
+    }
+
+    if (!room.selectedPack || room.selectedPack._count.questions < 5) {
+      throw new ValidationError('Pack must have at least 5 questions');
+    }
+
+    const updatedRoom = await prisma.room.update({
+      where: { id: roomId },
+      data: {
+        status: 'PLAYING',
+        startedAt: new Date(),
+        currentQuestionIndex: 0,
+      },
+      include: {
+        creator: {
+          select: { id: true, username: true, displayName: true, avatar: true },
+        },
+        selectedPack: {
+          include: {
+            questions: { orderBy: { orderIndex: 'asc' } },
+          },
+        },
+        members: {
+          where: { isActive: true },
+          include: {
+            user: {
+              select: { id: true, username: true, displayName: true, avatar: true },
+            },
+          },
+        },
+      },
+    });
+
+    return { room: updatedRoom, gameStarted: true };
   }
 }
 

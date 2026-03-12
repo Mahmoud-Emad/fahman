@@ -17,7 +17,7 @@ import {
 import * as NavigationBar from "expo-navigation-bar";
 import * as Linking from "expo-linking";
 import { ThemeProvider } from "./src/themes";
-import { AuthProvider, useAuth, ToastProvider, useToast, MessagingProvider } from "./src/contexts";
+import { AuthProvider, useAuth, ToastProvider, useToast, MessagingProvider, FriendsProvider } from "./src/contexts";
 import { HomeScreen, WelcomeScreen, SettingsScreen, LoginScreen, CredentialLoginScreen, ForgotPasswordScreen, RoomsScreen, RoomDetailsScreen, RoomConfigScreen, RoomLobbyScreen, PackCreationScreen, JoinRoomScreen, ProfileScreen, UserProfileScreen, BlockedUsersScreen, GameResultsScreen } from "./src/screens";
 import { AvatarSelectionModal } from "./src/components/profile/AvatarSelectionModal";
 import { colors } from "./src/themes";
@@ -224,9 +224,10 @@ function AppContent() {
   const [showWelcome, setShowWelcome] = useState(true);
   const appState = useRef(AppState.currentState);
   const navigationRef = useRef<any>(null);
+  const initialUrlHandled = useRef(false);
 
   // Get auth state from context
-  const { isAuthenticated, isInitializing, connectionError, checkConnection, isNewUser, clearNewUserFlag, updateProfile, user } = useAuth();
+  const { isAuthenticated, isInitializing, connectionError, isNewUser, clearNewUserFlag, updateProfile, user } = useAuth();
   const { showToast, hideToast } = useToast();
 
   // Handle avatar selection for new users
@@ -250,29 +251,12 @@ function AppContent() {
     setShowWelcome(false);
   }, []);
 
-  // Show connection error toast when there's a connection issue
+  // When connection drops, go back to WelcomeScreen (shows error + retry UI)
   useEffect(() => {
     if (connectionError && !showWelcome) {
-      showToast({
-        message: connectionError,
-        variant: 'error',
-        duration: 0, // Persistent until dismissed
-        actionText: 'Retry',
-        onAction: async () => {
-          // Don't hide toast yet - let checkConnection update the state
-          // If connection succeeds, connectionError becomes null and toast auto-hides
-          // If connection fails, error persists and toast stays visible
-          const connected = await checkConnection();
-          if (connected) {
-            hideToast();
-          }
-        },
-      });
-    } else if (!connectionError) {
-      // Connection restored - hide the toast
-      hideToast();
+      setShowWelcome(true);
     }
-  }, [connectionError, showWelcome, showToast, hideToast, checkConnection]);
+  }, [connectionError, showWelcome]);
 
   // Handle deep links for room joining
   useEffect(() => {
@@ -283,26 +267,24 @@ function AppContent() {
         const { path, queryParams } = Linking.parse(event.url);
 
         if (path === 'join-room' && queryParams?.code) {
-          const roomCode = queryParams.code as string;
-          const password = queryParams.password as string | undefined;
+          const roomCode = String(queryParams.code);
 
-          // Wait for navigation to be ready
+          // Validate room code format (4-8 alphanumeric characters)
+          if (!/^[A-Z0-9]{4,8}$/i.test(roomCode)) return;
+
           if (navigationRef.current?.isReady()) {
-            // Show loading toast
             showToast({
               message: `Loading room ${roomCode}...`,
               variant: 'info',
-              duration: 0, // Persistent until we dismiss it
+              duration: 0,
             });
 
             try {
-              // Fetch room details by code
               const response = await roomsService.getRoomByCode(roomCode);
 
               if (response.success && response.data) {
                 const room = response.data;
 
-                // Transform to RoomData format for JoinRoom screen
                 const roomData: RoomData = {
                   id: room.id,
                   title: room.title,
@@ -316,19 +298,17 @@ function AppContent() {
                     avatar: m.user.avatar || undefined,
                   })) || [],
                   totalUsers: room.currentPlayers,
-                  questionsCount: 10, // Default, will be updated by backend
+                  questionsCount: 10,
                   currentQuestion: room.currentQuestionIndex,
                   status: room.status === "WAITING" ? "waiting" : room.status === "PLAYING" ? "playing" : "finished",
                 };
 
-                // Dismiss loading toast
                 hideToast();
 
-                // Navigate to JoinRoom screen
+                // Do NOT pass password from deep link — JoinRoomScreen prompts if needed
                 navigationRef.current.navigate('JoinRoom', {
                   room: roomData,
                   roomCode: room.code,
-                  password,
                 });
               } else {
                 hideToast();
@@ -348,8 +328,10 @@ function AppContent() {
             }
           }
         } else if (path === 'add-friend' && queryParams?.gameId) {
-          // Handle add friend deep link
-          const gameId = queryParams.gameId as string;
+          const gameId = String(queryParams.gameId);
+
+          // Validate game ID format (4-10 digit number)
+          if (!/^[0-9]{4,10}$/.test(gameId)) return;
 
           if (navigationRef.current?.isReady()) {
             showToast({
@@ -366,25 +348,8 @@ function AppContent() {
               });
             }, 2000);
           }
-        } else if (path === 'invite' && queryParams?.referrer) {
-          // Handle app invite/referral deep link
-          const referrerId = queryParams.referrer as string;
-
-          if (navigationRef.current?.isReady()) {
-            // Track referral in backend (referrerId available for future use)
-
-            showToast({
-              message: 'Welcome to Fahman! 🎮',
-              variant: 'success',
-              duration: 3000,
-            });
-
-            // Navigate to home or onboarding
-            navigationRef.current.navigate('Home');
-          }
         }
-      } catch (error) {
-        console.error('Error handling deep link:', error);
+      } catch {
         hideToast();
         showToast({
           message: 'Invalid link',
@@ -394,12 +359,15 @@ function AppContent() {
       }
     };
 
-    // Handle initial URL (when app is opened from a link)
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
+    // Handle initial URL (when app is opened from a link) — only once
+    if (!initialUrlHandled.current) {
+      Linking.getInitialURL().then((url) => {
+        if (url && !initialUrlHandled.current) {
+          initialUrlHandled.current = true;
+          handleDeepLink({ url });
+        }
+      });
+    }
 
     // Handle URL events (when app is already open)
     const subscription = Linking.addEventListener('url', handleDeepLink);
@@ -455,9 +423,11 @@ function AppContent() {
       ) : (
         <NavigationContainer ref={navigationRef}>
           {isAuthenticated ? (
-            <MessagingProvider navigationRef={navigationRef}>
-              <MainStack />
-            </MessagingProvider>
+            <FriendsProvider navigationRef={navigationRef}>
+              <MessagingProvider navigationRef={navigationRef}>
+                <MainStack />
+              </MessagingProvider>
+            </FriendsProvider>
           ) : (
             <AuthStack />
           )}

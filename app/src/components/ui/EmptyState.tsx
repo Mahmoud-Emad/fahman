@@ -5,12 +5,12 @@ import React from "react";
 import { View } from "react-native";
 import { Text } from "./Text";
 import { Pressable } from "./Pressable";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { colors, withOpacity } from "@/themes";
 
 export interface EmptyStateProps {
   /** Icon name from Ionicons */
-  icon: string;
+  icon: IconName;
   /** Main title text */
   title: string;
   /** Description text (optional) */
@@ -68,10 +68,10 @@ export function EmptyState({
           className="w-16 h-16 rounded-full items-center justify-center mb-4"
           style={{ backgroundColor: withOpacity(colors.neutral[400], 0.1) }}
         >
-          <Icon name={icon as any} size={iconSize} color={colors.neutral[400]} />
+          <Icon name={icon} size={iconSize} color={colors.neutral[400]} />
         </View>
       ) : (
-        <Icon name={icon as any} size={iconSize} color={colors.neutral[400]} />
+        <Icon name={icon} size={iconSize} color={colors.neutral[400]} />
       )}
 
       <Text

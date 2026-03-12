@@ -5,12 +5,14 @@
 
 import { readdirSync, statSync, existsSync } from 'fs';
 import { join, basename, extname } from 'path';
-import { config } from '../../config/env';
-import { getRedis } from '../../config/redis';
-import logger from '../../shared/utils/logger';
+import { config } from '@config/env';
+import { prisma } from '@config/database';
+import { getRedis } from '@config/redis';
+import { ValidationError, ConflictError } from '@shared/utils/errors';
+import logger from '@shared/utils/logger';
 
 // Avatar directory paths
-const AVATARS_DIR = join(__dirname, '../store/avatars');
+const AVATARS_DIR = join(__dirname, '../../store/avatars');
 const FREE_DIR = join(AVATARS_DIR, 'free');
 const ALBUMS_DIR = join(AVATARS_DIR, 'albums');
 
@@ -88,7 +90,7 @@ class AvatarService {
       .map(filename => ({
         id: generateAvatarId('free', filename),
         name: toDisplayName(filename),
-        url: `${this.baseUrl}/store/avatars/free/${filename}`,
+        url: `${this.baseUrl}/static/store/avatars/free/${filename}`,
       }));
   }
 
@@ -117,7 +119,7 @@ class AvatarService {
         const avatars: AvatarImage[] = files.map(filename => ({
           id: generateAvatarId('albums', albumName, filename),
           name: toDisplayName(filename),
-          url: `${this.baseUrl}/store/avatars/albums/${albumName}/${filename}`,
+          url: `${this.baseUrl}/static/store/avatars/albums/${albumName}/${filename}`,
         }));
 
         return {
@@ -125,7 +127,7 @@ class AvatarService {
           name: albumName,
           displayName: toDisplayName(albumName),
           previewUrl: previewFile
-            ? `${this.baseUrl}/store/avatars/albums/${albumName}/${previewFile}`
+            ? `${this.baseUrl}/static/store/avatars/albums/${albumName}/${previewFile}`
             : '',
           avatars,
           price: 100, // Default price in coins - can be stored in DB later
@@ -172,11 +174,63 @@ class AvatarService {
   }
 
   /**
-   * Check if user owns an album.
-   * Returns false until the Purchase model is added to the schema.
+   * Check if user owns an album
    */
-  async checkAlbumOwnership(_userId: string, _albumId: string): Promise<boolean> {
-    return false;
+  async checkAlbumOwnership(userId: string, albumId: string): Promise<boolean> {
+    const purchase = await prisma.avatarPurchase.findUnique({
+      where: { userId_albumId: { userId, albumId } },
+    });
+    return !!purchase;
+  }
+
+  /**
+   * Get all album IDs owned by a user
+   */
+  async getUserOwnedAlbumIds(userId: string): Promise<string[]> {
+    const purchases = await prisma.avatarPurchase.findMany({
+      where: { userId },
+      select: { albumId: true },
+    });
+    return purchases.map(p => p.albumId);
+  }
+
+  /**
+   * Purchase an avatar album (deduct coins + create DB record)
+   */
+  async purchaseAlbum(userId: string, albumId: string): Promise<{ albumId: string; purchased: boolean; newBalance: number }> {
+    const album = await this.getAlbum(albumId);
+    if (!album) {
+      throw new ValidationError('Album not found');
+    }
+
+    // All checks + mutations inside a single transaction to prevent races
+    const result = await prisma.$transaction(async (tx) => {
+      // Check ownership inside tx to prevent double-spend
+      const existing = await tx.avatarPurchase.findUnique({
+        where: { userId_albumId: { userId, albumId } },
+      });
+      if (existing) {
+        throw new ConflictError('You already own this album');
+      }
+
+      // Atomic balance check + deduct: only updates if coins >= price
+      const deducted = await tx.user.updateMany({
+        where: { id: userId, coins: { gte: album.price } },
+        data: { coins: { decrement: album.price } },
+      });
+      if (deducted.count === 0) {
+        throw new ValidationError('Not enough coins');
+      }
+
+      await tx.avatarPurchase.create({
+        data: { userId, albumId, price: album.price },
+      });
+
+      const user = await tx.user.findUnique({ where: { id: userId }, select: { coins: true } });
+      return user!.coins;
+    });
+
+    return { albumId, purchased: true, newBalance: result };
   }
 }
 

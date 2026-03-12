@@ -1,14 +1,16 @@
 [pack-info]
+id = "74a08c27-e799-48ce-b137-18280443617d"
 name = "Geography Expert"
 description = "Are you a Geography Expert? Test your knowledge with our Geography Expert quiz!"
 version = "1.0.0"
 author = "Fahman"
-cover = "./media/pack1.png"
+cover = "./media/cover.png"
 text-hint = ""
 price = 0
-preview-questions = 0
+preview-questions = 3
 number-of-questions = 8
 category = "geography"
+free = true
 
 [question1]
 question = "What is the largest country in the world by area?"

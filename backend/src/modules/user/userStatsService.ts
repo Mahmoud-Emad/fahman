@@ -3,7 +3,7 @@
  * Aggregates user statistics from game gameSessions and player answers
  */
 
-import { prisma } from '../../config/database';
+import { prisma } from '@config/database';
 import { AchievementService } from '../game/achievementService';
 
 export class UserStatsService {
@@ -11,7 +11,7 @@ export class UserStatsService {
    * Get aggregated user statistics
    */
   static async getUserStats(userId: string) {
-    const [gamesPlayed, wins, totalPointsData, topScores, user] = await Promise.all([
+    const [gamesPlayed, wins, totalPointsData, topScores, user, friendsCount] = await Promise.all([
       // Count total games played by user (rooms with completed game sessions)
       prisma.roomMember.count({
         where: {
@@ -58,6 +58,16 @@ export class UserStatsService {
           bestStreak: true,
         },
       }),
+
+      // Count accepted friends
+      prisma.friendship.count({
+        where: {
+          OR: [
+            { userId, status: 'ACCEPTED' },
+            { friendId: userId, status: 'ACCEPTED' },
+          ],
+        },
+      }),
     ]);
 
     const totalPoints = totalPointsData._sum.score || 0;
@@ -68,9 +78,10 @@ export class UserStatsService {
       wins,
       winRate: Math.round(winRate * 10) / 10, // Round to 1 decimal
       totalPoints,
+      friendsCount,
       topScores: topScores.map((s) => ({
         score: s.score,
-        roomTitle: s.room.title,
+        roomTitle: s.room?.title ?? 'Deleted Room',
       })),
       currentStreak: user?.currentStreak || 0,
       bestStreak: user?.bestStreak || 0,
@@ -117,20 +128,22 @@ export class UserStatsService {
       take: limit,
     });
 
-    return recentMembers.map((member) => {
-      const session = member.room.gameSessions[0];
-      const isWinner = session?.winnerId === userId;
+    return recentMembers
+      .filter((member) => member.room != null)
+      .map((member) => {
+        const session = member.room.gameSessions[0];
+        const isWinner = session?.winnerId === userId;
 
-      return {
-        id: member.room.id,
-        roomTitle: member.room.title,
-        roomCode: member.room.code,
-        packTitle: member.room.selectedPack?.title || 'Unknown Pack',
-        result: isWinner ? 'won' : 'lost',
-        score: member.score,
-        playedAt: session?.endedAt?.toISOString() || member.joinedAt.toISOString(),
-      };
-    });
+        return {
+          id: member.room.id,
+          roomTitle: member.room.title,
+          roomCode: member.room.code,
+          packTitle: member.room.selectedPack?.title || 'Unknown Pack',
+          result: isWinner ? 'won' : 'lost',
+          score: member.score,
+          playedAt: session?.endedAt?.toISOString() || member.joinedAt.toISOString(),
+        };
+      });
   }
 
   /**

@@ -1,18 +1,21 @@
 [pack-info]
+id = "0451ae0f-be6a-448b-af7c-d7625dba1656"
 name = "افلام و مسلسلات مصريه"
 description = "خمن الافيه اتقال في مسلسل او فيلم ايه و قول اسم الفيلم/مسلسل 😂💃🔥"
 version = "1.0.0"
-author = "Mahmoud Emad"
-cover = "./media/cover.jpg"
+author = "Fahman"
+cover = "./media/cover.png"
 text-hint = "اكتب اسم الفيلم/مسلسل اللي اتقال فيه الافيه ده"
 price = 20
 preview-questions = 3
 number-of-questions = 20
+category = "films"
+free = false
 
 [question1]
 question = "انا مش كرم انا كريم"
 answer = "الداده دودي"
-cover = "./media/question1.jpg"
+cover = "./media/question1.png"
 
 [question2]
 question = "انا بابا يلا"
@@ -49,7 +52,7 @@ answer = "ولاد العم"
 [question10]
 question = "هو عشان عبيط يعني تقوم تضحك عليه؟"
 answer = "صعيدي في الجامعه الامريكيه"
-cover = "./media/question10.jpg"
+cover = "./media/question10.png"
 
 [question11]
 question = "شوفت اللعب يا روح امك؟"

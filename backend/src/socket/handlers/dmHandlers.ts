@@ -4,8 +4,8 @@
  */
 
 import { Server } from 'socket.io';
-import { prisma } from '../../config/database';
-import { getRedis } from '../../config/redis';
+import { prisma } from '@config/database';
+import { getRedis } from '@config/redis';
 import { MessageType, FriendshipStatus } from '@prisma/client';
 import {
   AuthenticatedSocket,
@@ -13,7 +13,8 @@ import {
   ServerToClientEvents,
   DirectMessage,
 } from '../types';
-import logger from '../../shared/utils/logger';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
 const TYPING_TTL = 5; // 5 seconds
 
@@ -106,13 +107,8 @@ export function registerDmHandlers(
         type: 'PRIVATE',
       };
 
-      // Send to recipient (find their socket)
-      io.sockets.sockets.forEach((s) => {
-        const authSocket = s as AuthenticatedSocket;
-        if (authSocket.userId === recipientId) {
-          authSocket.emit('dm:message', dmMessage);
-        }
-      });
+      // Send to recipient
+      io.to(`user:${recipientId}`).emit('dm:message', dmMessage);
 
       // Also send back to sender for confirmation
       socket.emit('dm:message', dmMessage);
@@ -122,7 +118,7 @@ export function registerDmHandlers(
 
       logger.debug(`DM sent from ${socket.username} to ${recipient.username}`);
     } catch (error) {
-      logger.error(`Error sending DM: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error sending DM: ${getErrorMessage(error)}`);
       socket.emit('error', { message: 'Failed to send message' });
     }
   });
@@ -141,19 +137,14 @@ export function registerDmHandlers(
       });
 
       // Notify recipient
-      io.sockets.sockets.forEach((s) => {
-        const authSocket = s as AuthenticatedSocket;
-        if (authSocket.userId === recipientId) {
-          authSocket.emit('dm:typing', {
-            senderId: socket.userId,
-            senderName: sender?.displayName || sender?.username || socket.username,
-          });
-        }
+      io.to(`user:${recipientId}`).emit('dm:typing', {
+        senderId: socket.userId,
+        senderName: sender?.displayName || sender?.username || socket.username,
       });
 
       // Redis TTL handles auto-cleanup — no setTimeout needed
     } catch (error) {
-      logger.error(`Error handling DM typing: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error handling DM typing: ${getErrorMessage(error)}`);
     }
   });
 
@@ -161,15 +152,14 @@ export function registerDmHandlers(
    * User stopped typing a DM
    */
   socket.on('dm:stopTyping', async ({ recipientId }) => {
-    await clearDmTypingStatus(socket.userId, recipientId);
+    try {
+      await clearDmTypingStatus(socket.userId, recipientId);
 
-    // Notify recipient
-    io.sockets.sockets.forEach((s) => {
-      const authSocket = s as AuthenticatedSocket;
-      if (authSocket.userId === recipientId) {
-        authSocket.emit('dm:stopTyping', { senderId: socket.userId });
-      }
-    });
+      // Notify recipient
+      io.to(`user:${recipientId}`).emit('dm:stopTyping', { senderId: socket.userId });
+    } catch (error) {
+      logger.error(`dm:stopTyping error: ${getErrorMessage(error)}`);
+    }
   });
 
   /**
@@ -189,16 +179,11 @@ export function registerDmHandlers(
       });
 
       // Notify sender that their messages were read
-      io.sockets.sockets.forEach((s) => {
-        const authSocket = s as AuthenticatedSocket;
-        if (authSocket.userId === senderId) {
-          authSocket.emit('dm:read', { byUserId: socket.userId });
-        }
-      });
+      io.to(`user:${senderId}`).emit('dm:read', { byUserId: socket.userId });
 
       logger.debug(`${socket.username} marked messages from ${senderId} as read`);
     } catch (error) {
-      logger.error(`Error marking DMs as read: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error marking DMs as read: ${getErrorMessage(error)}`);
     }
   });
 }
@@ -242,10 +227,5 @@ export function emitDirectMessage(
   recipientId: string,
   message: DirectMessage
 ): void {
-  io.sockets.sockets.forEach((s) => {
-    const authSocket = s as AuthenticatedSocket;
-    if (authSocket.userId === recipientId) {
-      authSocket.emit('dm:message', message);
-    }
-  });
+  io.to(`user:${recipientId}`).emit('dm:message', message);
 }

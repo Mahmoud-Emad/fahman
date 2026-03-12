@@ -4,26 +4,30 @@
  */
 
 import jwt, { type SignOptions } from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { JWTPayload } from '../types/index';
 import { UnauthorizedError } from './errors';
-import { config } from '../../config/env';
+import { config } from '@config/env';
 
 /**
- * Generate an access token for a user
+ * Generate an access token for a user (includes jti for blacklisting)
  */
 export function generateAccessToken(payload: JWTPayload): string {
-  return jwt.sign(payload, config.jwt.secret, {
+  return jwt.sign({ ...payload, jti: randomUUID() }, config.jwt.secret, {
     expiresIn: config.jwt.expiresIn,
   } as SignOptions);
 }
 
 /**
- * Generate a refresh token for a user
+ * Generate a refresh token for a user (includes jti for Redis tracking)
+ * Returns both the signed token and the jti for storage.
  */
-export function generateRefreshToken(payload: JWTPayload): string {
-  return jwt.sign(payload, config.jwt.refreshSecret, {
+export function generateRefreshToken(payload: JWTPayload): { token: string; jti: string } {
+  const jti = randomUUID();
+  const token = jwt.sign({ ...payload, jti }, config.jwt.refreshSecret, {
     expiresIn: config.jwt.refreshExpiresIn,
   } as SignOptions);
+  return { token, jti };
 }
 
 /**

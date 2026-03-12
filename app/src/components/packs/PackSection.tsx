@@ -28,6 +28,8 @@ interface PackSectionProps {
   isComingSoon?: boolean;
   /** Loading state */
   isLoading?: boolean;
+  /** Show price badges on pack cards */
+  showPrices?: boolean;
 }
 
 /**
@@ -42,7 +44,7 @@ const getSectionIcon = (type: PackSectionType): string => {
     case "popular":
       return "people";
     case "store":
-      return "cart";
+      return "gift";
     default:
       return "grid";
   }
@@ -61,6 +63,7 @@ export function PackSection({
   onCreatePress,
   isComingSoon = false,
   isLoading = false,
+  showPrices = false,
 }: PackSectionProps) {
   return (
     <View className="mb-4">
@@ -76,7 +79,7 @@ export function PackSection({
             color={colors.primary[500]}
           />
         </View>
-        <Text variant="body" className="font-semibold">
+        <Text variant="body" className="font-semibold flex-1" numberOfLines={1}>
           {title}
         </Text>
       </View>
@@ -127,6 +130,7 @@ export function PackSection({
           onSelectPack={onSelectPack}
           showCreateButton={showCreateButton}
           onCreatePress={onCreatePress}
+          showPrices={showPrices}
         />
       )}
     </View>

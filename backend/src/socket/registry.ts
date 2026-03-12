@@ -6,19 +6,18 @@
 
 import { Server } from 'socket.io';
 import {
-  AuthenticatedSocket,
   ClientToServerEvents,
   ServerToClientEvents,
   InterServerEvents,
   SocketData,
   DirectMessage,
+  NotificationData,
   RoomInfo,
 } from './types';
 import { broadcastRoomClosed, notifyPlayerKicked } from './handlers/roomHandlers';
 import { broadcastGameStarted, cleanupGameRoom } from './handlers/gameHandlers';
 import { emitDirectMessage } from './handlers/dmHandlers';
 import { isUserOnline as checkUserOnline } from './presenceHandlers';
-import logger from '../shared/utils/logger';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 
@@ -36,28 +35,12 @@ export class SocketRegistry {
   // Notifications
   // ---------------------------------------------------------------------------
 
-  sendNotificationToUser(userId: string, notification: unknown): void {
-    let sent = false;
-    this.io.sockets.sockets.forEach((socket) => {
-      const authSocket = socket as AuthenticatedSocket;
-      if (authSocket.userId === userId) {
-        authSocket.emit('notification:new', notification);
-        sent = true;
-      }
-    });
-
-    if (!sent) {
-      logger.debug(`User ${userId} not connected, notification not sent in real-time`);
-    }
+  sendNotificationToUser(userId: string, notification: NotificationData): void {
+    this.io.to(`user:${userId}`).emit('notification:new', notification);
   }
 
   sendNotificationUpdate(userId: string, data: { id: string; actionTaken: string }): void {
-    this.io.sockets.sockets.forEach((socket) => {
-      const authSocket = socket as AuthenticatedSocket;
-      if (authSocket.userId === userId) {
-        authSocket.emit('notification:updated', data);
-      }
-    });
+    this.io.to(`user:${userId}`).emit('notification:updated', data);
   }
 
   // ---------------------------------------------------------------------------
@@ -131,14 +114,11 @@ export class SocketRegistry {
       checkUserOnline(friendId),
     ]);
 
-    this.io.sockets.sockets.forEach((socket) => {
-      const authSocket = socket as AuthenticatedSocket;
-      if (authSocket.userId === friendId && userOnline) {
-        authSocket.emit('friend:online', { userId });
-      }
-      if (authSocket.userId === userId && friendOnline) {
-        authSocket.emit('friend:online', { userId: friendId });
-      }
-    });
+    if (userOnline) {
+      this.io.to(`user:${friendId}`).emit('friend:online', { userId });
+    }
+    if (friendOnline) {
+      this.io.to(`user:${userId}`).emit('friend:online', { userId: friendId });
+    }
   }
 }

@@ -9,10 +9,11 @@ import * as oauthController from './oauthController';
 import * as phoneController from './phoneController';
 import * as passwordController from './passwordController';
 import { updateProfile } from '../user/userController';
-import { validate } from '../../shared/middleware/validation';
-import { authenticate } from '../../shared/middleware/auth';
-import { authLimiter } from '../../shared/middleware/rateLimiter';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { validate } from '@shared/middleware/validation';
+import { authenticate } from '@shared/middleware/auth';
+import { authLimiter } from '@shared/middleware/rateLimiter';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
+import type { AuthRequest } from '@shared/types/index';
 import {
   registerSchema,
   registerWithPhoneSchema,
@@ -429,7 +430,7 @@ router.get('/me', authenticate, asyncHandler(authController.getCurrentUser));
  *       401:
  *         description: Unauthorized
  */
-router.post('/logout', authenticate, authController.logout as any);
+router.post('/logout', authenticate, asyncHandler<AuthRequest>(authController.logout));
 
 // =============================================================================
 // PASSWORD RESET ROUTES
@@ -540,7 +541,7 @@ router.post('/reset-password', validate(resetPasswordSchema), asyncHandler(passw
  *       401:
  *         description: Unauthorized
  */
-router.patch('/profile', authenticate, validate(updateProfileSchema), asyncHandler(updateProfile as any));
+router.patch('/profile', authenticate, validate(updateProfileSchema), asyncHandler<AuthRequest>(updateProfile));
 
 /**
  * @openapi
@@ -572,7 +573,7 @@ router.patch('/profile', authenticate, validate(updateProfileSchema), asyncHandl
  *       409:
  *         description: Phone number already registered
  */
-router.post('/phone', authenticate, validate(updatePhoneNumberSchema), asyncHandler(phoneController.updatePhoneNumber as any));
+router.post('/phone', authenticate, validate(updatePhoneNumberSchema), asyncHandler<AuthRequest>(phoneController.updatePhoneNumber));
 
 /**
  * @openapi
@@ -592,7 +593,7 @@ router.post('/phone', authenticate, validate(updatePhoneNumberSchema), asyncHand
  *       401:
  *         description: Unauthorized
  */
-router.delete('/phone', authenticate, asyncHandler(phoneController.removePhoneNumber as any));
+router.delete('/phone', authenticate, asyncHandler<AuthRequest>(phoneController.removePhoneNumber));
 
 /**
  * @openapi
@@ -626,6 +627,6 @@ router.delete('/phone', authenticate, asyncHandler(phoneController.removePhoneNu
  *       401:
  *         description: Unauthorized
  */
-router.post('/phone/verify-user', authenticate, validate(verifyUserPhoneSchema), asyncHandler(phoneController.verifyUserPhone as any));
+router.post('/phone/verify-user', authenticate, validate(verifyUserPhoneSchema), asyncHandler<AuthRequest>(phoneController.verifyUserPhone));
 
 export default router;

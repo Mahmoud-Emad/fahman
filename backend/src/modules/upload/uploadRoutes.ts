@@ -4,8 +4,8 @@
  */
 
 import { Router } from 'express';
-import { authenticate } from '../../shared/middleware/auth';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import * as uploadController from './uploadController';
 
 const router = Router();

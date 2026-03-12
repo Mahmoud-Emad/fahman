@@ -5,7 +5,7 @@
 
 import Redis from 'ioredis';
 import { config } from './env';
-import logger from '../shared/utils/logger';
+import logger from '@shared/utils/logger';
 
 let redisClient: Redis | null = null;
 

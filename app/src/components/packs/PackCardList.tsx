@@ -19,6 +19,8 @@ interface PackCardListProps {
   onCreatePress?: () => void;
   /** Card size variant */
   size?: "sm" | "md";
+  /** Show price badges on cards */
+  showPrices?: boolean;
 }
 
 /**
@@ -31,6 +33,7 @@ export function PackCardList({
   showCreateButton = false,
   onCreatePress,
   size = "md",
+  showPrices = false,
 }: PackCardListProps) {
   return (
     <ScrollView
@@ -45,6 +48,7 @@ export function PackCardList({
           isSelected={pack.id === selectedPackId}
           onPress={onSelectPack}
           size={size}
+          showPrice={showPrices}
         />
       ))}
       {showCreateButton && onCreatePress && (

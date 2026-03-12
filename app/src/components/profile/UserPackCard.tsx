@@ -19,6 +19,8 @@ export interface UserPackData {
   visibility: "PUBLIC" | "PRIVATE" | "FRIENDS";
   isPublished: boolean;
   createdAt: string;
+  /** Whether the current user can edit/delete this pack */
+  isEditable?: boolean;
 }
 
 interface UserPackCardProps {
@@ -173,38 +175,14 @@ export function UserPackCard({ pack, onPress, onEdit, onDelete }: UserPackCardPr
           </View>
         </View>
 
-        {/* Action Buttons Row - Below content for better spacing */}
-        <View style={{ flexDirection: "row", marginTop: 12, gap: 8, justifyContent: "flex-end" }}>
-          {/* Edit Button */}
-          <Pressable
-            onPress={(e) => {
-              e.stopPropagation();
-              onEdit(pack);
-            }}
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 8,
-              paddingHorizontal: 16,
-              borderRadius: 10,
-              backgroundColor: withOpacity(colors.primary[500], 0.1),
-              gap: 6,
-            }}
-          >
-            <Icon name="create-outline" size="sm" color={colors.primary[500]} />
-            <Text variant="body-sm" style={{ color: colors.primary[500], fontWeight: "600" }}>
-              Edit
-            </Text>
-          </Pressable>
-
-          {/* Delete Button */}
-          {onDelete && (
+        {/* Action Buttons Row - Only show for editable packs */}
+        {pack.isEditable !== false && (
+          <View style={{ flexDirection: "row", marginTop: 12, gap: 8, justifyContent: "flex-end" }}>
+            {/* Edit Button */}
             <Pressable
               onPress={(e) => {
                 e.stopPropagation();
-                onDelete(pack);
+                onEdit(pack);
               }}
               style={{
                 flex: 1,
@@ -214,17 +192,43 @@ export function UserPackCard({ pack, onPress, onEdit, onDelete }: UserPackCardPr
                 paddingVertical: 8,
                 paddingHorizontal: 16,
                 borderRadius: 10,
-                backgroundColor: withOpacity(colors.error, 0.1),
+                backgroundColor: withOpacity(colors.primary[500], 0.1),
                 gap: 6,
               }}
             >
-              <Icon name="trash-outline" size="sm" color={colors.error} />
-              <Text variant="body-sm" style={{ color: colors.error, fontWeight: "600" }}>
-                Delete
+              <Icon name="create-outline" size="sm" color={colors.primary[500]} />
+              <Text variant="body-sm" style={{ color: colors.primary[500], fontWeight: "600" }}>
+                Edit
               </Text>
             </Pressable>
-          )}
-        </View>
+
+            {/* Delete Button */}
+            {onDelete && (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onDelete(pack);
+                }}
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  borderRadius: 10,
+                  backgroundColor: withOpacity(colors.error, 0.1),
+                  gap: 6,
+                }}
+              >
+                <Icon name="trash-outline" size="sm" color={colors.error} />
+                <Text variant="body-sm" style={{ color: colors.error, fontWeight: "600" }}>
+                  Delete
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
       </View>
     </Pressable>
   );

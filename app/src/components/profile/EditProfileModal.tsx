@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { View, Pressable, TextInput, ActivityIndicator, Alert } from "react-native";
 import { Text, Icon, Avatar, Modal, Button } from "@/components/ui";
 import { colors } from "@/themes";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -49,8 +50,8 @@ export function EditProfileModal({ visible, onClose, user, onSave }: EditProfile
         bio: bio.trim(),
       });
       onClose();
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to update profile");
+    } catch (error) {
+      Alert.alert("Error", getErrorMessage(error));
     } finally {
       setSaving(false);
     }

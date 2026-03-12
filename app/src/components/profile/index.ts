@@ -10,7 +10,7 @@ export { UserPackCard, UserPackCardSkeleton, type UserPackData } from "./UserPac
 export { UserRoomCard, UserRoomCardSkeleton, type UserRoomData } from "./UserRoomCard";
 export { AvatarSelectionModal } from "./AvatarSelectionModal";
 export { AvatarGridItem } from "./AvatarGrid";
-export { CollectionAlbumCard, ShopAlbumCard, AvatarEmptyState } from "./AvatarAlbumSection";
+export { CollectionAlbumCard, AvatarEmptyState } from "./AvatarAlbumSection";
 export { UserProfileHeader } from "./UserProfileHeader";
 export { UserProfileContent } from "./UserProfileContent";
 export type { DisplayData } from "./UserProfileHeader";

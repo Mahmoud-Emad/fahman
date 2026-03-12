@@ -9,6 +9,7 @@ export {
   type UseMessagingReturn,
 } from "./useMessaging";
 
+// useFriends is a thin wrapper — prefer useFriendsContext() from @/contexts
 export {
   useFriends,
   findOrCreateConversationForFriend,

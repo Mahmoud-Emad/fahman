@@ -4,12 +4,13 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../../config/database';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { ValidationError, NotFoundError, ConflictError } from '../../shared/utils/errors';
-import logger from '../../shared/utils/logger';
-import { AuthRequest } from '../../shared/types/index';
-import { config } from '../../config/env';
+import { prisma } from '@config/database';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { ValidationError, NotFoundError, ConflictError } from '@shared/utils/errors';
+import { hashPassword, comparePassword } from '@shared/utils/passwordUtils';
+import logger from '@shared/utils/logger';
+import { AuthRequest } from '@shared/types/index';
+import { config } from '@config/env';
 import { generateVerificationCode, getUserResponse, createAuthResponse } from './authService';
 
 /**
@@ -30,17 +31,18 @@ export async function sendPhoneVerification(req: Request, res: Response, next: N
     }
 
     const code = generateVerificationCode();
+    const codeHash = await hashPassword(code);
     const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        phoneVerificationCode: code,
+        phoneVerificationCode: codeHash,
         phoneVerificationExpiry: expiry,
       },
     });
 
-    logger.info(`Phone verification code for ${phoneNumber}: ${code}`);
+    logger.info(`Phone verification code sent for ${phoneNumber}`);
 
     res.json(
       successResponse(
@@ -82,7 +84,8 @@ export async function verifyPhone(req: Request, res: Response, next: NextFunctio
       throw new ValidationError('Verification code has expired. Please request a new code.');
     }
 
-    if (user.phoneVerificationCode !== code) {
+    const isValid = await comparePassword(code, user.phoneVerificationCode);
+    if (!isValid) {
       throw new ValidationError('Invalid verification code');
     }
 
@@ -98,7 +101,7 @@ export async function verifyPhone(req: Request, res: Response, next: NextFunctio
 
     logger.info(`Phone verified for user: ${user.username} (${phoneNumber})`);
 
-    res.json(createAuthResponse(updatedUser, 'Phone verified successfully'));
+    res.json(await createAuthResponse(updatedUser, 'Phone verified successfully'));
   } catch (error) {
     next(error);
   }
@@ -117,6 +120,7 @@ export async function updatePhoneNumber(req: AuthRequest, res: Response, next: N
     }
 
     const code = generateVerificationCode();
+    const codeHash = await hashPassword(code);
     const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     const user = await prisma.user.update({
@@ -124,12 +128,12 @@ export async function updatePhoneNumber(req: AuthRequest, res: Response, next: N
       data: {
         phoneNumber,
         phoneVerified: false,
-        phoneVerificationCode: code,
+        phoneVerificationCode: codeHash,
         phoneVerificationExpiry: expiry,
       },
     });
 
-    logger.info(`Phone verification code for ${phoneNumber}: ${code}`);
+    logger.info(`Phone verification code sent for ${phoneNumber}`);
 
     res.json(
       successResponse(
@@ -209,7 +213,8 @@ export async function verifyUserPhone(req: AuthRequest, res: Response, next: Nex
       throw new ValidationError('Verification code has expired. Please request a new code.');
     }
 
-    if (user.phoneVerificationCode !== code) {
+    const isValid = await comparePassword(code, user.phoneVerificationCode);
+    if (!isValid) {
       throw new ValidationError('Invalid verification code');
     }
 

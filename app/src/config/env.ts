@@ -1,17 +1,22 @@
 /**
  * Environment configuration
+ *
+ * DEV_SERVER_IP is auto-configured by `make configure`.
+ * Run it whenever your machine's IP changes.
  */
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Get the appropriate localhost URL based on platform
+// Auto-configured by `make configure` — do not edit manually
+const DEV_SERVER_IP = '192.168.1.34';
+
+// Get the appropriate server host based on platform
 const getLocalUrl = () => {
   if (Platform.OS === 'android') {
-    // Android emulator uses 10.0.2.2 to reach host machine
-    // For physical device, use your computer's IP: 192.168.1.60
-    return '192.168.1.116:3000'; // Change to 10.0.2.2:3000 for emulator
+    return `${DEV_SERVER_IP}:3000`;
   }
-  // iOS simulator can use localhost
-  return 'localhost:3000';
+  // iOS simulator can use localhost, physical iOS device needs the IP
+  return Constants.isDevice ? `${DEV_SERVER_IP}:3000` : 'localhost:3000';
 };
 
 const LOCAL_URL = getLocalUrl();

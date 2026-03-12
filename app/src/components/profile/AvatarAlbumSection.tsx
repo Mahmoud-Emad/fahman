@@ -1,12 +1,10 @@
 /**
- * AvatarAlbumSection - Collection, Shop album cards and empty states for AvatarSelectionModal
+ * AvatarAlbumSection - Collection album cards and empty states for AvatarSelectionModal
  */
 import React, { useEffect, useRef } from "react";
 import { View, Pressable, Image, Animated } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Text, Icon } from "@/components/ui";
-import { type AvatarAlbum } from "@/services/avatarService";
-import { type AvatarAlbum as StoreAlbum } from "@/services/storeService";
+import { Text, Icon, type IconName } from "@/components/ui";
+import { type AvatarAlbum } from "@/services/storeService";
 import { colors, withOpacity } from "@/themes";
 import { AvatarGridItem } from "./AvatarGrid";
 
@@ -20,7 +18,7 @@ export function AvatarEmptyState({
   actionLabel,
   onAction,
 }: {
-  icon: string;
+  icon: IconName;
   title: string;
   subtitle: string;
   actionLabel?: string;
@@ -32,7 +30,7 @@ export function AvatarEmptyState({
         className="w-20 h-20 rounded-full items-center justify-center mb-4"
         style={{ backgroundColor: withOpacity(colors.primary[500], 0.1) }}
       >
-        <Icon name={icon as any} size="xl" color={colors.primary[500]} />
+        <Icon name={icon} size="xl" color={colors.primary[500]} />
       </View>
       <Text variant="body" className="font-semibold text-center mb-1">
         {title}
@@ -67,7 +65,7 @@ export function CollectionAlbumCard({
   selectedUrl,
   currentAvatar,
 }: {
-  album: StoreAlbum;
+  album: AvatarAlbum;
   isExpanded: boolean;
   onToggle: () => void;
   onSelectAvatar: (url: string) => void;
@@ -157,113 +155,3 @@ export function CollectionAlbumCard({
   );
 }
 
-/**
- * Shop album card with gradient header and purchase button
- */
-export function ShopAlbumCard({
-  album,
-  onPurchase,
-  onBuyCoins,
-  userCoins,
-}: {
-  album: AvatarAlbum;
-  onPurchase: () => void;
-  onBuyCoins: () => void;
-  userCoins: number;
-}) {
-  const canAfford = userCoins >= album.price;
-  const previewAvatars = album.avatars.slice(0, 3);
-
-  return (
-    <View className="mb-3 rounded-2xl overflow-hidden" style={{ backgroundColor: colors.white }}>
-      <LinearGradient
-        colors={[colors.primary[400], colors.primary[600]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="p-4"
-      >
-        <View className="flex-row items-start justify-between">
-          <View className="flex-1">
-            <Text variant="body" className="font-bold" style={{ color: colors.white }} numberOfLines={1}>
-              {album.displayName}
-            </Text>
-            <Text variant="caption" style={{ color: withOpacity(colors.white, 0.8) }}>
-              {album.avatarCount} avatars
-            </Text>
-          </View>
-          <View
-            className="flex-row items-center px-3 py-1.5 rounded-full"
-            style={{ backgroundColor: withOpacity(colors.white, 0.2) }}
-          >
-            <Icon name="diamond" customSize={14} color={colors.white} />
-            <Text variant="body-sm" className="ml-1 font-bold" style={{ color: colors.white }}>
-              {album.price}
-            </Text>
-          </View>
-        </View>
-      </LinearGradient>
-
-      <View className="flex-row justify-center py-4 px-3">
-        {previewAvatars.map((avatar) => (
-          <View
-            key={avatar.id}
-            className="rounded-xl overflow-hidden mx-1"
-            style={{
-              width: 56,
-              height: 56,
-              opacity: 0.7,
-              borderWidth: 2,
-              borderColor: colors.neutral[200],
-            }}
-          >
-            {avatar.url ? (
-              <Image
-                source={{ uri: avatar.url }}
-                style={{ width: "100%", height: "100%" }}
-                resizeMode="cover"
-              />
-            ) : (
-              <View className="flex-1 items-center justify-center" style={{ backgroundColor: colors.neutral[100] }}>
-                <Icon name="person" size="md" color={colors.neutral[400]} />
-              </View>
-            )}
-          </View>
-        ))}
-        {album.avatars.length > 3 && (
-          <View
-            className="w-14 h-14 rounded-xl items-center justify-center mx-1"
-            style={{ backgroundColor: colors.neutral[100] }}
-          >
-            <Text variant="body-sm" className="font-bold" color="muted">
-              +{album.avatars.length - 3}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View className="px-4 pb-4">
-        <Pressable
-          onPress={canAfford ? onPurchase : onBuyCoins}
-          delayPressIn={0}
-          className="py-3 rounded-xl items-center"
-          style={{ backgroundColor: canAfford ? colors.primary[500] : colors.neutral[100] }}
-        >
-          <View className="flex-row items-center">
-            <Icon
-              name={canAfford ? "cart" : "diamond"}
-              customSize={16}
-              color={canAfford ? colors.white : colors.gold}
-            />
-            <Text
-              variant="body-sm"
-              className="ml-2 font-semibold"
-              style={{ color: canAfford ? colors.white : colors.gold }}
-            >
-              {canAfford ? "Unlock Album" : `Need ${album.price - userCoins} more coins`}
-            </Text>
-          </View>
-        </Pressable>
-      </View>
-    </View>
-  );
-}

@@ -4,21 +4,23 @@
  */
 
 import { Response, NextFunction } from 'express';
-import { prisma } from '../../config/database';
+import { prisma } from '@config/database';
 import { UserStatsService } from './userStatsService';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { NotFoundError } from '../../shared/utils/errors';
-import { AuthRequest } from '../../shared/types/index';
-import { isUserOnline } from '../../socket';
-import logger from '../../shared/utils/logger';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { NotFoundError } from '@shared/utils/errors';
+import { AuthRequest } from '@shared/types/index';
+import { getAuthUser } from '@shared/middleware/getAuthUser';
+import { getSocketRegistry } from '@/socket';
+import logger from '@shared/utils/logger';
 import { getUserResponse } from '../auth/authService';
+import { StreakService } from './streakService';
 
 /**
  * Get current user statistics
  * GET /api/users/me/stats
  */
 export async function getUserStats(req: AuthRequest, res: Response) {
-  const userId = req.user!.id;
+  const userId = getAuthUser(req).id;
 
   const stats = await UserStatsService.getUserStats(userId);
 
@@ -30,7 +32,7 @@ export async function getUserStats(req: AuthRequest, res: Response) {
  * GET /api/users/me/games/recent
  */
 export async function getRecentGames(req: AuthRequest, res: Response) {
-  const userId = req.user!.id;
+  const userId = getAuthUser(req).id;
   const limit = parseInt(req.query.limit as string) || 10;
 
   const games = await UserStatsService.getRecentGames(userId, limit);
@@ -43,11 +45,20 @@ export async function getRecentGames(req: AuthRequest, res: Response) {
  * GET /api/users/me/achievements
  */
 export async function getUserAchievements(req: AuthRequest, res: Response) {
-  const userId = req.user!.id;
+  const userId = getAuthUser(req).id;
 
   const achievements = await UserStatsService.getUserAchievements(userId);
 
   return res.json(successResponse(achievements, 'Achievements retrieved successfully'));
+}
+
+/**
+ * Update streak on app open
+ * POST /api/users/me/streak
+ */
+export async function updateStreak(req: AuthRequest, res: Response) {
+  const streak = await StreakService.updateStreak(getAuthUser(req).id);
+  return res.json(successResponse(streak));
 }
 
 /**
@@ -56,7 +67,7 @@ export async function getUserAchievements(req: AuthRequest, res: Response) {
  */
 export async function getPublicProfile(req: AuthRequest, res: Response) {
   const { userId } = req.params;
-  const currentUserId = req.user!.id;
+  const currentUserId = getAuthUser(req).id;
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -124,7 +135,7 @@ export async function getPublicProfile(req: AuthRequest, res: Response) {
     isPremium: user.role === 'ADMIN',
     friendsCount,
     isFriend: !!friendship,
-    isOnline: await isUserOnline(userId),
+    isOnline: await getSocketRegistry()?.isUserOnline(userId) ?? false,
     pendingRequest: pendingRequest ? {
       id: pendingRequest.id,
       isSentByMe: pendingRequest.userId === currentUserId,
@@ -223,7 +234,7 @@ export async function updateProfile(req: AuthRequest, res: Response, next: NextF
     }
 
     const user = await prisma.user.update({
-      where: { id: req.user.id },
+      where: { id: getAuthUser(req).id },
       data: updateData,
     });
 

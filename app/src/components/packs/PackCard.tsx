@@ -20,6 +20,8 @@ interface PackCardProps {
   onPress: (pack: PackData) => void;
   /** Card size variant */
   size?: "sm" | "md";
+  /** Show price badge for paid packs */
+  showPrice?: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export function PackCard({
   isSelected = false,
   onPress,
   size = "md",
+  showPrice = false,
 }: PackCardProps) {
   const cardSize = size === "sm" ? { width: 100, height: 120 } : { width: 120, height: 140 };
   const logoSize = size === "sm" ? 48 : 56;
@@ -107,6 +110,19 @@ export function PackCard({
         >
           {pack.questionsCount} questions
         </Text>
+
+        {/* Price badge */}
+        {showPrice && pack.price != null && pack.price > 0 && (
+          <View
+            className="absolute bottom-2 left-2 right-2 flex-row items-center justify-center py-1 rounded-md"
+            style={{ backgroundColor: withOpacity(colors.gold, 0.9) }}
+          >
+            <Icon name="diamond" customSize={10} color={colors.white} />
+            <Text variant="caption" style={{ fontSize: 10, color: colors.white, marginLeft: 2 }} className="font-bold">
+              {pack.price}
+            </Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );

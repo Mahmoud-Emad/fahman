@@ -8,3 +8,4 @@ export {
   type RoomNavigationData,
 } from "./roomData";
 export { transformUrl } from "./transformUrl";
+export { getErrorMessage } from "./errorUtils";

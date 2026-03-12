@@ -10,6 +10,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import { Text, Button, Icon, Input } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { useAuth } from "@/contexts";
 import type { RootStackParamList } from "../../App";
 
@@ -96,8 +97,8 @@ export function ForgotPasswordScreen() {
       }
 
       setStep("reset");
-    } catch (error: any) {
-      setErrors({ email: error.message || "Failed to send reset code" });
+    } catch (error) {
+      setErrors({ email: getErrorMessage(error) });
     } finally {
       setSubmitting(false);
     }
@@ -126,8 +127,8 @@ export function ForgotPasswordScreen() {
           },
         ]
       );
-    } catch (error: any) {
-      const message = error.message || "Failed to reset password";
+    } catch (error) {
+      const message = getErrorMessage(error);
       const lowerMessage = message.toLowerCase();
 
       if (lowerMessage.includes("code")) {

@@ -3,8 +3,9 @@
  */
 
 import { Server } from 'socket.io';
-import { prisma } from '../../config/database';
-import gameService from '../../modules/game/gameService';
+import { prisma } from '@config/database';
+import { getRedis } from '@config/redis';
+import gameService from '@modules/game/gameService';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
@@ -14,10 +15,14 @@ import {
   GameFinishedData,
   PlayerScore,
 } from '../types';
-import logger from '../../shared/utils/logger';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
-// Track active game timers
+// Track active game timers (question countdown intervals)
 const gameTimers: Map<string, NodeJS.Timeout> = new Map();
+
+// Track game-start delay timers (the 2s pause before the first question)
+const gameStartTimers: Map<string, NodeJS.Timeout> = new Map();
 
 export function registerGameHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
@@ -26,12 +31,16 @@ export function registerGameHandlers(
   /**
    * Submit answer via WebSocket
    */
-  socket.on('game:answer', async ({ roomId, answer, betAmount, timeRemaining }) => {
+  socket.on('game:answer', async ({ roomId, answer, betAmount }) => {
     try {
+      if (!socket.rooms.has(roomId)) {
+        socket.emit('error', { message: 'Not in room' });
+        return;
+      }
+
       const result = await gameService.submitAnswer(roomId, socket.userId, {
         answer,
         betAmount,
-        timeRemaining,
       });
 
       // Notify all players that this player answered
@@ -43,14 +52,30 @@ export function registerGameHandlers(
       // Check if all players have answered
       const allAnswered = await checkAllAnswered(roomId);
       if (allAnswered) {
-        // Clear timer and show results
+        // Acquire Redis lock to prevent duplicate broadcastQuestionResults
+        // from concurrent last-answer submissions
+        const room = await prisma.room.findUnique({
+          where: { id: roomId },
+          select: { currentQuestionIndex: true },
+        });
+        if (!room) return;
+
+        const lockKey = `lock:question:${roomId}:${room.currentQuestionIndex}`;
+        try {
+          const redis = getRedis();
+          const lock = await redis.set(lockKey, '1', 'EX', 5, 'NX');
+          if (!lock) return; // another handler already processing results
+        } catch {
+          // Redis unavailable — proceed without lock (best-effort)
+        }
+
         clearGameTimer(roomId);
         await broadcastQuestionResults(io, roomId);
       }
 
       logger.info(`${socket.username} answered in room ${roomId}: correct=${result.isCorrect}`);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to submit answer';
+      const msg = getErrorMessage(error);
       logger.error(`Error submitting answer: ${msg}`);
       socket.emit('error', { message: msg });
     }
@@ -105,7 +130,7 @@ export function registerGameHandlers(
 
       logger.info(`Game next in room ${roomId}: finished=${result.finished}`);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to move to next question';
+      const msg = getErrorMessage(error);
       logger.error(`Error moving to next question: ${msg}`);
       socket.emit('error', { message: msg });
     }
@@ -159,24 +184,45 @@ export async function broadcastGameStarted(
       },
     };
 
-    // Small delay before sending question
-    setTimeout(() => {
+    // Small delay before sending question — track the timer for cleanup
+    const timer = setTimeout(() => {
+      gameStartTimers.delete(roomId);
       io.to(roomId).emit('game:question', questionData);
       startQuestionTimer(io, roomId, firstQuestion.timeLimit);
     }, 2000);
+    gameStartTimers.set(roomId, timer);
   }
 }
 
 /**
- * Start countdown timer for a question
+ * Start countdown timer for a question and record start time in Redis
  */
-function startQuestionTimer(
+async function startQuestionTimer(
   io: Server<ClientToServerEvents, ServerToClientEvents>,
   roomId: string,
   timeLimit: number
-): void {
+): Promise<void> {
   // Clear any existing timer
   clearGameTimer(roomId);
+
+  // Store question start time in Redis for server-side time calculation
+  try {
+    const room = await prisma.room.findUnique({
+      where: { id: roomId },
+      select: { currentQuestionIndex: true },
+    });
+    if (room) {
+      const redis = getRedis();
+      await redis.set(
+        `question:start:${roomId}:${room.currentQuestionIndex}`,
+        Date.now().toString(),
+        'EX',
+        120,
+      );
+    }
+  } catch (error) {
+    logger.error(`Failed to store question start time: ${getErrorMessage(error)}`);
+  }
 
   let timeLeft = timeLimit;
 
@@ -382,4 +428,10 @@ async function broadcastGameFinished(
  */
 export function cleanupGameRoom(roomId: string): void {
   clearGameTimer(roomId);
+
+  const startTimer = gameStartTimers.get(roomId);
+  if (startTimer) {
+    clearTimeout(startTimer);
+    gameStartTimers.delete(roomId);
+  }
 }

@@ -82,7 +82,7 @@ import {
   getOnlineFriends,
   notifyFriendsOnline,
   notifyFriendsOffline,
-} from '../../socket/presenceHandlers';
+} from '@/socket/presenceHandlers';
 
 // ---------------------------------------------------------------------------
 // IO mock helper

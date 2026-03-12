@@ -4,15 +4,16 @@
  */
 
 import { Server } from 'socket.io';
-import { prisma } from '../../config/database';
-import { getRedis } from '../../config/redis';
+import { prisma } from '@config/database';
+import { getRedis } from '@config/redis';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
   ServerToClientEvents,
   ChatMessage,
 } from '../types';
-import logger from '../../shared/utils/logger';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
 const TYPING_TTL = 3; // 3 seconds
 
@@ -85,7 +86,7 @@ export function registerChatHandlers(
 
       logger.debug(`Chat message in room ${roomId} from ${socket.username}`);
     } catch (error) {
-      logger.error(`Error sending chat message: ${error instanceof Error ? error.message : error}`);
+      logger.error(`Error sending chat message: ${getErrorMessage(error)}`);
       socket.emit('error', { message: 'Failed to send message' });
     }
   });
@@ -94,16 +95,20 @@ export function registerChatHandlers(
    * User is typing
    */
   socket.on('chat:typing', async ({ roomId }) => {
-    await setTypingStatus(socket.userId, roomId);
+    try {
+      if (!socket.rooms.has(roomId)) return;
 
-    // Notify others in the room
-    socket.to(roomId).emit('chat:typing', {
-      roomId,
-      userId: socket.userId,
-      username: socket.username,
-    });
+      await setTypingStatus(socket.userId, roomId);
 
-    // Redis TTL handles auto-cleanup — no setTimeout needed
+      // Notify others in the room
+      socket.to(roomId).emit('chat:typing', {
+        roomId,
+        userId: socket.userId,
+        username: socket.username,
+      });
+    } catch (error) {
+      logger.error(`chat:typing error: ${getErrorMessage(error)}`);
+    }
   });
 
   /**
@@ -173,9 +178,21 @@ export async function broadcastSystemMessage(
 export async function cleanupUserTyping(userId: string): Promise<void> {
   try {
     const redis = getRedis();
-    const keys = await redis.keys(`typing:room:*:${userId}`);
+    const keys: string[] = [];
+    const stream = redis.scanStream({ match: `typing:room:*:${userId}`, count: 100 });
+
+    await new Promise<void>((resolve, reject) => {
+      stream.on('data', (batch: string[]) => keys.push(...batch));
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+
     if (keys.length > 0) {
-      await redis.del(...keys);
+      const pipeline = redis.pipeline();
+      for (const key of keys) {
+        pipeline.del(key);
+      }
+      await pipeline.exec();
     }
   } catch {
     // Best effort cleanup

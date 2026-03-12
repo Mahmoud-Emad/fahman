@@ -5,8 +5,8 @@
 
 import { Response, NextFunction } from 'express';
 import * as settingsService from './settingsService';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { AuthRequest } from '../../shared/types/index';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { AuthRequest } from '@shared/types/index';
 
 /**
  * Get user settings
@@ -45,11 +45,12 @@ export async function resetSettings(req: AuthRequest, res: Response, next: NextF
 }
 
 /**
- * Delete user account
+ * Delete user account (requires password confirmation)
  */
 export async function deleteAccount(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await settingsService.deleteUserAccount(req.user.id);
+    const { password } = req.body;
+    await settingsService.deleteUserAccount(req.user.id, password);
     res.json(successResponse('Account deleted successfully'));
   } catch (error) {
     next(error);

@@ -3,8 +3,8 @@
  * Business logic for game results, leaderboard, and question scoring
  */
 
-import { prisma } from '../../config/database';
-import { NotFoundError, ForbiddenError } from '../../shared/utils/errors';
+import { prisma } from '@config/database';
+import { NotFoundError, ForbiddenError } from '@shared/utils/errors';
 
 export class GameResultsService {
   /**

@@ -5,9 +5,10 @@
 import express from 'express';
 import * as packController from './packController';
 import * as questionController from './questionController';
-import { authenticate } from '../../shared/middleware/auth';
-import { validate, validateUUID } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate, optionalAuth } from '@shared/middleware/auth';
+import { validate, validateUUID } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
+import { cacheResponse } from '@shared/middleware/cache';
 import {
   createPackSchema,
   updatePackSchema,
@@ -53,7 +54,7 @@ const router = express.Router();
  *       200:
  *         description: List of packs
  */
-router.get('/', asyncHandler(packController.getPublicPacks));
+router.get('/', cacheResponse(60), asyncHandler(packController.getPublicPacks));
 
 /**
  * @openapi
@@ -105,7 +106,7 @@ router.get('/system', asyncHandler(packController.getSystemPacks));
  *       200:
  *         description: List of popular packs
  */
-router.get('/popular', asyncHandler(packController.getPopularPacks));
+router.get('/popular', cacheResponse(120), asyncHandler(packController.getPopularPacks));
 
 /**
  * @openapi
@@ -146,7 +147,7 @@ router.get('/selection', authenticate, asyncHandler(packController.getPacksForSe
  *       404:
  *         description: Pack not found
  */
-router.get('/:id', validateUUID('id'), asyncHandler(packController.getPackById));
+router.get('/:id', optionalAuth, validateUUID('id'), asyncHandler(packController.getPackById));
 
 /**
  * @openapi

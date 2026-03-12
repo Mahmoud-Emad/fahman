@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon, Avatar, EmptyState, Pressable } from "@/components/ui";
 import { colors } from "@/themes";
 import { friendsService, type Friend } from "@/services/friendsService";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 interface BlockedUser {
   id: string;
@@ -52,8 +53,8 @@ export function BlockedUsersScreen() {
       } else {
         setError("Failed to load blocked users");
       }
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -76,8 +77,8 @@ export function BlockedUsersScreen() {
                 // Remove from list
                 setBlockedUsers((prev) => prev.filter((u) => u.id !== user.id));
               }
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Failed to unblock user");
+            } catch (err) {
+              Alert.alert("Error", getErrorMessage(err));
             }
           },
         },

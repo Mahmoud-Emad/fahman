@@ -4,9 +4,10 @@
  */
 
 import { Router } from 'express';
-import { authenticate, optionalAuth } from '../../shared/middleware/auth';
-import { validate, validateUUID } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate, optionalAuth } from '@shared/middleware/auth';
+import { validate, validateUUID } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
+import { cacheResponse } from '@shared/middleware/cache';
 import * as storeController from './storeController';
 import { purchaseCoinsSchema } from './storeValidator';
 
@@ -26,7 +27,7 @@ const router = Router();
  *       200:
  *         description: Store data retrieved successfully
  */
-router.get('/', optionalAuth, asyncHandler(storeController.getAllStoreData));
+router.get('/', cacheResponse(300), optionalAuth, asyncHandler(storeController.getAllStoreData));
 
 /**
  * @openapi
@@ -42,7 +43,7 @@ router.get('/', optionalAuth, asyncHandler(storeController.getAllStoreData));
  *       200:
  *         description: Avatars retrieved successfully
  */
-router.get('/avatars', optionalAuth, asyncHandler(storeController.getAvatars));
+router.get('/avatars', cacheResponse(300), optionalAuth, asyncHandler(storeController.getAvatars));
 
 /**
  * @openapi
@@ -58,7 +59,7 @@ router.get('/avatars', optionalAuth, asyncHandler(storeController.getAvatars));
  *       200:
  *         description: Sounds retrieved successfully
  */
-router.get('/sounds', optionalAuth, asyncHandler(storeController.getSounds));
+router.get('/sounds', cacheResponse(300), optionalAuth, asyncHandler(storeController.getSounds));
 
 /**
  * @openapi
@@ -187,15 +188,27 @@ router.post('/purchase/sound/:soundId', authenticate, validateUUID('soundId'), a
  *             type: object
  *             required:
  *               - packageId
+ *               - receiptToken
+ *               - platform
  *             properties:
  *               packageId:
  *                 type: string
  *                 enum: [pack_50, pack_150, pack_500]
+ *               receiptToken:
+ *                 type: string
+ *                 description: Platform-specific payment receipt token
+ *               platform:
+ *                 type: string
+ *                 enum: [ios, android, web]
  *     responses:
  *       200:
  *         description: Coins purchased successfully
  *       400:
  *         description: Invalid package
+ *       403:
+ *         description: Payment verification failed
+ *       409:
+ *         description: Receipt already processed (replay attack)
  */
 router.post('/purchase/coins', authenticate, validate(purchaseCoinsSchema), asyncHandler(storeController.purchaseCoins));
 

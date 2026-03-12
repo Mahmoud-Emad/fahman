@@ -2,22 +2,20 @@
  * usePacks - Hook for managing pack selection data
  */
 import { useState, useCallback } from "react";
-import { packsService, type Pack, type PackSelectionResponse } from "@/services/packsService";
+import { packsService, type Pack, type FreeStorePack } from "@/services/packsService";
 import type { PackData } from "@/components/packs/types";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { transformUrl } from "@/utils/transformUrl";
 
 export interface UsePacksReturn {
-  // Pack data for selection modal
   suggestedPacks: PackData[];
   ownedPacks: PackData[];
   popularPacks: PackData[];
-
-  // Loading state
+  freeStorePacks: PackData[];
+  paidStorePacks: PackData[];
   isLoading: boolean;
   error: string | null;
-
-  // Actions
   fetchPacks: () => Promise<void>;
   refreshPacks: () => Promise<void>;
 }
@@ -36,6 +34,27 @@ function transformPack(pack: Pack, isOwned: boolean = false): PackData {
     questionsCount: pack._count?.questions || 0,
     createdBy: pack.creator?.username,
     isOwned,
+    price: 0,
+  };
+}
+
+/**
+ * Transform store pack to UI pack data
+ */
+function transformStorePack(pack: FreeStorePack, isOwned: boolean = false): PackData {
+  return {
+    id: pack.id,
+    title: pack.name,
+    description: pack.description || undefined,
+    logoUri: transformUrl(pack.coverUrl) || undefined,
+    logoInitials: pack.name.substring(0, 2).toUpperCase(),
+    isPublic: true,
+    questionsCount: pack.numberOfQuestions,
+    createdBy: pack.author,
+    isOwned,
+    isStorePack: true,
+    storePackId: pack.id,
+    price: pack.free ? 0 : pack.price,
   };
 }
 
@@ -47,6 +66,8 @@ export function usePacks(): UsePacksReturn {
   const [suggestedPacks, setSuggestedPacks] = useState<PackData[]>([]);
   const [ownedPacks, setOwnedPacks] = useState<PackData[]>([]);
   const [popularPacks, setPopularPacks] = useState<PackData[]>([]);
+  const [freeStorePacks, setFreeStorePacks] = useState<PackData[]>([]);
+  const [paidStorePacks, setPaidStorePacks] = useState<PackData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,10 +79,21 @@ export function usePacks(): UsePacksReturn {
       const response = await packsService.getPacksForSelection();
 
       if (response.success && response.data) {
-        const { systemPacks, userPacks, popularPacks: popular } = response.data;
+        const {
+          systemPacks,
+          userPacks,
+          popularPacks: popular,
+          freeStorePacks: free,
+          paidStorePacks: paid,
+          ownedStorePacks: ownedStore,
+        } = response.data;
 
         const suggested = systemPacks.map((p) => transformPack(p, false));
-        const owned = userPacks.map((p) => transformPack(p, true));
+        const userOwned = userPacks.map((p) => transformPack(p, true));
+        const purchasedStore = (ownedStore || []).map((p) => transformStorePack(p, true));
+        const owned = [...userOwned, ...purchasedStore];
+        const freeStore = (free || []).map((p) => transformStorePack(p));
+        const paidStore = (paid || []).map((p) => transformStorePack(p));
 
         // Deduplicate popular: exclude packs already in suggested or owned
         const excludeIds = new Set([
@@ -75,11 +107,13 @@ export function usePacks(): UsePacksReturn {
         setSuggestedPacks(suggested);
         setOwnedPacks(owned);
         setPopularPacks(uniquePopular);
+        setFreeStorePacks(freeStore);
+        setPaidStorePacks(paidStore);
       } else {
         setError(response.message || "Failed to load packs");
       }
-    } catch (err: any) {
-      const message = err.message || "Failed to load packs";
+    } catch (err) {
+      const message = getErrorMessage(err);
       setError(message);
       toast.error(message);
     } finally {
@@ -95,6 +129,8 @@ export function usePacks(): UsePacksReturn {
     suggestedPacks,
     ownedPacks,
     popularPacks,
+    freeStorePacks,
+    paidStorePacks,
     isLoading,
     error,
     fetchPacks,

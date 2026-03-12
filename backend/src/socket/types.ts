@@ -23,7 +23,6 @@ export interface ClientToServerEvents {
     roomId: string;
     answer: number | number[];
     betAmount: number;
-    timeRemaining: number;
   }) => void;
   'game:next': (data: { roomId: string }) => void;
 
@@ -189,6 +188,8 @@ export interface DirectMessage {
   text: string;
   timestamp: Date;
   type: 'PRIVATE' | 'ROOM_INVITE';
+  roomCode?: string;
+  roomTitle?: string;
 }
 
 export interface NotificationData {
@@ -197,8 +198,8 @@ export interface NotificationData {
   title: string;
   message: string;
   senderId: string | null;
-  senderName: string | null;
-  actionData: Record<string, any> | null;
+  senderName?: string | null;
+  actionData: unknown;
   createdAt: Date;
   sender?: {
     id: string;

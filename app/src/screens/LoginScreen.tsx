@@ -16,6 +16,7 @@ import { DecoCircle } from "@/components/decorative";
 import { TERMS_OF_SERVICE, PRIVACY_POLICY } from "@/constants";
 import { colors, withOpacity } from "@/themes";
 import { useAuth, useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { GOOGLE_CLIENT_ID, FACEBOOK_APP_ID } from "@/config/env";
 import type { RootStackParamList } from "../../App";
 
@@ -72,11 +73,9 @@ export function LoginScreen() {
   /**
    * Check if an error is a network error
    */
-  const isNetworkError = (error: any): boolean => {
+  const isNetworkError = (error: unknown): boolean => {
     if (error instanceof TypeError) return true;
-    if (error.name === 'TypeError' || error.name === 'AbortError') return true;
-
-    const message = (error.message || '').toLowerCase();
+    const message = getErrorMessage(error).toLowerCase();
     return (
       message.includes('network') ||
       message.includes('fetch') ||
@@ -86,11 +85,11 @@ export function LoginScreen() {
     );
   };
 
-  const getErrorMessage = (error: any, fallback: string): string => {
+  const getLoginErrorMessage = (error: unknown, fallback: string): string => {
     if (isNetworkError(error)) {
       return 'Network error. Please check your connection and try again.';
     }
-    return error.message || fallback;
+    return getErrorMessage(error);
   };
 
   const handleGoogleAuth = async (token: string) => {
@@ -99,8 +98,8 @@ export function LoginScreen() {
       await loginWithGoogle({ token });
       // Navigation happens automatically via AuthStack -> MainStack swap
       // when isAuthenticated changes in AuthContext
-    } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to login with Google"));
+    } catch (error) {
+      toast.error(getLoginErrorMessage(error, "Failed to login with Google"));
       setAuthLoading(false);
     }
   };
@@ -111,8 +110,8 @@ export function LoginScreen() {
       await loginWithFacebook({ token });
       // Navigation happens automatically via AuthStack -> MainStack swap
       // when isAuthenticated changes in AuthContext
-    } catch (error: any) {
-      toast.error(getErrorMessage(error, "Failed to login with Facebook"));
+    } catch (error) {
+      toast.error(getLoginErrorMessage(error, "Failed to login with Facebook"));
       setAuthLoading(false);
     }
   };

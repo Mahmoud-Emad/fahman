@@ -4,12 +4,13 @@
 
 import { Response, NextFunction } from 'express';
 import packService from './packService';
-import { successResponse, paginatedResponse } from '../../shared/utils/responseFormatter';
-import { AuthRequest } from '../../shared/types/index';
+import { successResponse, paginatedResponse } from '@shared/utils/responseFormatter';
+import { AuthRequest } from '@shared/types/index';
+import { getAuthUser } from '@shared/middleware/getAuthUser';
 
 export async function createPack(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const pack = await packService.createPack(req.user.id, req.body);
+    const pack = await packService.createPack(getAuthUser(req).id, req.body);
     res.status(201).json(successResponse(pack, 'Pack created successfully'));
   } catch (error) {
     next(error);
@@ -33,7 +34,7 @@ export async function getPublicPacks(req: AuthRequest, res: Response, next: Next
 
 export async function getMyPacks(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const packs = await packService.getUserPacks(req.user.id);
+    const packs = await packService.getUserPacks(getAuthUser(req).id);
     res.json(successResponse(packs));
   } catch (error) {
     next(error);
@@ -42,7 +43,7 @@ export async function getMyPacks(req: AuthRequest, res: Response, next: NextFunc
 
 export async function getPackById(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const pack = await packService.getPackById(req.params.id);
+    const pack = await packService.getPackById(req.params.id, req.user?.id);
     res.json(successResponse(pack));
   } catch (error) {
     next(error);
@@ -51,7 +52,7 @@ export async function getPackById(req: AuthRequest, res: Response, next: NextFun
 
 export async function updatePack(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const pack = await packService.updatePack(req.params.id, req.user.id, req.body);
+    const pack = await packService.updatePack(req.params.id, getAuthUser(req).id, req.body);
     res.json(successResponse(pack, 'Pack updated successfully'));
   } catch (error) {
     next(error);
@@ -62,8 +63,8 @@ export async function deletePack(req: AuthRequest, res: Response, next: NextFunc
   try {
     const result = await packService.deletePack(
       req.params.id,
-      req.user.id,
-      req.user.role === 'ADMIN'
+      getAuthUser(req).id,
+      getAuthUser(req).role === 'ADMIN'
     );
     res.json(successResponse(result));
   } catch (error) {
@@ -73,7 +74,7 @@ export async function deletePack(req: AuthRequest, res: Response, next: NextFunc
 
 export async function publishPack(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const pack = await packService.publishPack(req.params.id, req.user.id);
+    const pack = await packService.publishPack(req.params.id, getAuthUser(req).id);
     res.json(successResponse(pack, 'Pack published successfully'));
   } catch (error) {
     next(error);
@@ -101,7 +102,7 @@ export async function getPopularPacks(req: AuthRequest, res: Response, next: Nex
 
 export async function getPacksForSelection(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await packService.getPacksForSelection(req.user.id);
+    const result = await packService.getPacksForSelection(getAuthUser(req).id);
     res.json(successResponse(result));
   } catch (error) {
     next(error);

@@ -6,16 +6,17 @@
 import { Response, NextFunction } from 'express';
 import roomService from './roomService';
 import roomMembersService from './roomMembersService';
-import { emitGameStarted, emitPlayerKicked, emitPlayerLeft, emitRoomClosed, emitRoomListUpdate } from '../../socket';
-import { successResponse, paginatedResponse } from '../../shared/utils/responseFormatter';
-import { AuthRequest } from '../../shared/types/index';
+import { getSocketRegistry } from '@/socket';
+import { successResponse, paginatedResponse } from '@shared/utils/responseFormatter';
+import { AuthRequest } from '@shared/types/index';
+import { getAuthUser } from '@shared/middleware/getAuthUser';
 
 /**
  * Create a new room
  */
 export async function createRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const room = await roomService.createRoom(req.user.id, req.body);
+    const room = await roomService.createRoom(getAuthUser(req).id, req.body);
     res.status(201).json(successResponse(room, 'Room created successfully'));
   } catch (error) {
     next(error);
@@ -101,8 +102,21 @@ export async function getRoomByCode(req: AuthRequest, res: Response, next: NextF
 export async function joinRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { password } = req.body;
-    const result = await roomMembersService.joinRoom(req.user.id, req.params.id, password);
-    emitRoomListUpdate(req.params.id, result.room.currentPlayers, result.room.status);
+    const result = await roomMembersService.joinRoom(getAuthUser(req).id, req.params.id, password);
+    const registry = getSocketRegistry();
+    if (registry) {
+      registry.emitPlayerJoined(req.params.id, {
+        id: result.member.user.id,
+        username: result.member.user.username,
+        displayName: result.member.user.displayName,
+        avatar: result.member.user.avatar,
+        score: result.member.score,
+        isReady: result.member.isReady,
+        role: result.member.role,
+      });
+      registry.emitRoomUpdated(req.params.id, { currentPlayers: result.room.currentPlayers });
+      registry.emitRoomListUpdate(req.params.id, result.room.currentPlayers, result.room.status);
+    }
     res.json(successResponse(result, 'Joined room successfully'));
   } catch (error) {
     next(error);
@@ -115,8 +129,21 @@ export async function joinRoom(req: AuthRequest, res: Response, next: NextFuncti
 export async function joinRoomByCode(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { roomCode, password } = req.body;
-    const result = await roomMembersService.joinRoomByCode(req.user.id, roomCode, password);
-    emitRoomListUpdate(result.room.id, result.room.currentPlayers, result.room.status);
+    const result = await roomMembersService.joinRoomByCode(getAuthUser(req).id, roomCode, password);
+    const registry = getSocketRegistry();
+    if (registry) {
+      registry.emitPlayerJoined(result.room.id, {
+        id: result.member.user.id,
+        username: result.member.user.username,
+        displayName: result.member.user.displayName,
+        avatar: result.member.user.avatar,
+        score: result.member.score,
+        isReady: result.member.isReady,
+        role: result.member.role,
+      });
+      registry.emitRoomUpdated(result.room.id, { currentPlayers: result.room.currentPlayers });
+      registry.emitRoomListUpdate(result.room.id, result.room.currentPlayers, result.room.status);
+    }
     res.json(successResponse(result, 'Joined room successfully'));
   } catch (error) {
     next(error);
@@ -128,14 +155,16 @@ export async function joinRoomByCode(req: AuthRequest, res: Response, next: Next
  */
 export async function leaveRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await roomMembersService.leaveRoom(req.user.id, req.params.id);
-
-    if (result.closed) {
-      emitRoomClosed(req.params.id, 'Host ended the room');
-    } else {
-      emitPlayerLeft(req.params.id, req.user.id);
+    const result = await roomMembersService.leaveRoom(getAuthUser(req).id, req.params.id);
+    const registry = getSocketRegistry();
+    if (registry) {
+      if (result.closed) {
+        registry.emitRoomClosed(req.params.id, 'Host ended the room');
+      } else {
+        registry.emitPlayerLeft(req.params.id, getAuthUser(req).id);
+      }
+      registry.emitRoomListUpdate(req.params.id, result.currentPlayers, result.status);
     }
-    emitRoomListUpdate(req.params.id, result.currentPlayers, result.status);
 
     const message = result.closed ? 'Room closed' : 'Left room successfully';
     res.json(successResponse(result, message));
@@ -149,9 +178,12 @@ export async function leaveRoom(req: AuthRequest, res: Response, next: NextFunct
  */
 export async function kickPlayer(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await roomMembersService.kickPlayer(req.user.id, req.params.id, req.params.userId);
-    emitPlayerKicked(req.params.id, req.params.userId, 'Kicked by room host');
-    emitRoomListUpdate(req.params.id, result.currentPlayers, result.status);
+    const result = await roomMembersService.kickPlayer(getAuthUser(req).id, req.params.id, req.params.userId);
+    const registry = getSocketRegistry();
+    if (registry) {
+      registry.emitPlayerKicked(req.params.id, req.params.userId, 'Kicked by room host');
+      registry.emitRoomListUpdate(req.params.id, result.currentPlayers, result.status);
+    }
     res.json(successResponse(result, 'Player kicked successfully'));
   } catch (error) {
     next(error);
@@ -163,7 +195,8 @@ export async function kickPlayer(req: AuthRequest, res: Response, next: NextFunc
  */
 export async function updateRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const room = await roomService.updateRoom(req.user.id, req.params.id, req.body);
+    const room = await roomService.updateRoom(getAuthUser(req).id, req.params.id, req.body);
+    getSocketRegistry()?.emitRoomUpdated(req.params.id, req.body);
     res.json(successResponse(room, 'Room updated successfully'));
   } catch (error) {
     next(error);
@@ -175,11 +208,11 @@ export async function updateRoom(req: AuthRequest, res: Response, next: NextFunc
  */
 export async function deleteRoom(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    emitRoomClosed(req.params.id, 'Room deleted by host');
+    getSocketRegistry()?.emitRoomClosed(req.params.id, 'Room deleted by host');
     const result = await roomService.deleteRoom(
-      req.user.id,
+      getAuthUser(req).id,
       req.params.id,
-      req.user.role === 'ADMIN'
+      getAuthUser(req).role === 'ADMIN'
     );
     res.json(successResponse(result));
   } catch (error) {
@@ -192,8 +225,8 @@ export async function deleteRoom(req: AuthRequest, res: Response, next: NextFunc
  */
 export async function startGame(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const result = await roomService.startGame(req.user.id, req.params.id);
-    emitGameStarted(req.params.id);
+    const result = await roomMembersService.startGame(getAuthUser(req).id, req.params.id);
+    getSocketRegistry()?.emitGameStarted(req.params.id);
     res.json(successResponse(result, 'Game started successfully'));
   } catch (error) {
     next(error);
@@ -205,7 +238,7 @@ export async function startGame(req: AuthRequest, res: Response, next: NextFunct
  */
 export async function getMyRooms(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const rooms = await roomService.getUserRooms(req.user.id);
+    const rooms = await roomService.getUserRooms(getAuthUser(req).id);
     res.json(successResponse(rooms));
   } catch (error) {
     next(error);
@@ -218,7 +251,8 @@ export async function getMyRooms(req: AuthRequest, res: Response, next: NextFunc
 export async function setReady(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { isReady } = req.body;
-    const member = await roomMembersService.setPlayerReady(req.user.id, req.params.id, isReady);
+    const member = await roomMembersService.setPlayerReady(getAuthUser(req).id, req.params.id, isReady);
+    getSocketRegistry()?.emitPlayerReady(req.params.id, getAuthUser(req).id, isReady);
     res.json(successResponse(member, isReady ? 'You are ready' : 'You are not ready'));
   } catch (error) {
     next(error);

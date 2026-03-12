@@ -5,14 +5,14 @@
  */
 
 import { Server } from 'socket.io';
-import { prisma } from '../config/database';
-import { getRedis } from '../config/redis';
+import { prisma } from '@config/database';
+import { getRedis } from '@config/redis';
 import {
-  AuthenticatedSocket,
   ClientToServerEvents,
   ServerToClientEvents,
 } from './types';
-import logger from '../shared/utils/logger';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
 const PRESENCE_TTL = 300; // 5 minutes
 const PRESENCE_PREFIX = 'presence:';
@@ -111,14 +111,11 @@ export async function notifyFriendsOnline(
       f.userId === userId ? f.friendId : f.userId
     );
 
-    io.sockets.sockets.forEach((socket) => {
-      const authSocket = socket as AuthenticatedSocket;
-      if (friendIds.includes(authSocket.userId)) {
-        authSocket.emit('friend:online', { userId });
-      }
-    });
+    for (const friendId of friendIds) {
+      io.to(`user:${friendId}`).emit('friend:online', { userId });
+    }
   } catch (error) {
-    logger.error(`Error notifying friends online: ${error instanceof Error ? error.message : error}`);
+    logger.error(`Error notifying friends online: ${getErrorMessage(error)}`);
   }
 }
 
@@ -144,13 +141,10 @@ export async function notifyFriendsOffline(
       f.userId === userId ? f.friendId : f.userId
     );
 
-    io.sockets.sockets.forEach((socket) => {
-      const authSocket = socket as AuthenticatedSocket;
-      if (friendIds.includes(authSocket.userId)) {
-        authSocket.emit('friend:offline', { userId });
-      }
-    });
+    for (const friendId of friendIds) {
+      io.to(`user:${friendId}`).emit('friend:offline', { userId });
+    }
   } catch (error) {
-    logger.error(`Error notifying friends offline: ${error instanceof Error ? error.message : error}`);
+    logger.error(`Error notifying friends offline: ${getErrorMessage(error)}`);
   }
 }

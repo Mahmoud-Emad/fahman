@@ -3,10 +3,9 @@
  * Business logic for friend request operations (send, accept, decline, cancel)
  */
 
-import { prisma } from '../../config/database';
-import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '../../shared/utils/errors';
+import { prisma } from '@config/database';
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '@shared/utils/errors';
 import notificationService from './notificationService';
-import { sendNotificationToUser, sendNotificationUpdate, emitFriendshipAccepted } from '../../socket';
 
 export class FriendRequestService {
   /**
@@ -69,13 +68,10 @@ export class FriendRequestService {
             },
           });
 
-          // Create and send real-time notification
+          // Create notification for the target user
           const rejectedNotification = await notificationService.createFriendRequestNotification(targetUserId, userId, updatedRequest.id);
-          if (rejectedNotification) {
-            sendNotificationToUser(targetUserId, rejectedNotification);
-          }
 
-          return { request: updatedRequest };
+          return { request: updatedRequest, notification: rejectedNotification };
       }
     }
 
@@ -93,13 +89,10 @@ export class FriendRequestService {
       },
     });
 
-    // Create and send real-time notification to target user
+    // Create notification for target user
     const notification = await notificationService.createFriendRequestNotification(targetUserId, userId, request.id);
-    if (notification) {
-      sendNotificationToUser(targetUserId, notification);
-    }
 
-    return { request };
+    return { request, notification };
   }
 
   /**
@@ -173,20 +166,11 @@ export class FriendRequestService {
 
     // Resolve the FRIEND_REQUEST notification for the acceptor
     const resolved = await notificationService.resolveByContext(userId, request.userId, 'FRIEND_REQUEST', 'accepted');
-    if (resolved) {
-      sendNotificationUpdate(userId, { id: resolved.id, actionTaken: 'accepted' });
-    }
 
-    // Notify the original sender that their request was accepted
+    // Create notification for the original sender
     const notification = await notificationService.createFriendAcceptedNotification(request.userId, userId);
-    if (notification) {
-      sendNotificationToUser(request.userId, notification);
-    }
 
-    // Notify both users of each other's online status via socket
-    emitFriendshipAccepted(request.userId, userId);
-
-    return { friendship };
+    return { friendship, resolved, notification, requesterId: request.userId };
   }
 
   /**
@@ -220,11 +204,8 @@ export class FriendRequestService {
 
     // Resolve the FRIEND_REQUEST notification for the decliner
     const resolved = await notificationService.resolveByContext(userId, request.userId, 'FRIEND_REQUEST', 'declined');
-    if (resolved) {
-      sendNotificationUpdate(userId, { id: resolved.id, actionTaken: 'declined' });
-    }
 
-    return { success: true };
+    return { success: true, resolved };
   }
 
   /**

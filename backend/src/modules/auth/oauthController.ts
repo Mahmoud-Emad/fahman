@@ -5,11 +5,11 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { OAuth2Client } from 'google-auth-library';
-import { prisma } from '../../config/database';
-import { UnauthorizedError, ConflictError } from '../../shared/utils/errors';
-import logger from '../../shared/utils/logger';
+import { prisma } from '@config/database';
+import { UnauthorizedError, ConflictError } from '@shared/utils/errors';
+import logger from '@shared/utils/logger';
 import { StreakService } from '../user/streakService';
-import { config } from '../../config/env';
+import { config } from '@config/env';
 import { createAuthResponse } from './authService';
 
 const googleClient = new OAuth2Client(config.oauth.googleClientId);
@@ -91,7 +91,7 @@ export async function loginWithGoogle(req: Request, res: Response, next: NextFun
     }
 
     const isNewGoogleUser = user.createdAt.getTime() === user.updatedAt.getTime();
-    res.json(createAuthResponse(user, isNewGoogleUser ? 'Account created successfully' : 'Login successful', isNewGoogleUser));
+    res.json(await createAuthResponse(user, isNewGoogleUser ? 'Account created successfully' : 'Login successful', isNewGoogleUser));
   } catch (error) {
     next(error);
   }
@@ -175,7 +175,7 @@ export async function loginWithFacebook(req: Request, res: Response, next: NextF
     }
 
     const isNewFacebookUser = user.createdAt.getTime() === user.updatedAt.getTime();
-    res.json(createAuthResponse(user, isNewFacebookUser ? 'Account created successfully' : 'Login successful', isNewFacebookUser));
+    res.json(await createAuthResponse(user, isNewFacebookUser ? 'Account created successfully' : 'Login successful', isNewFacebookUser));
   } catch (error) {
     next(error);
   }

@@ -15,6 +15,12 @@ export interface PackData {
   questionsCount: number;
   createdBy?: string;
   isOwned?: boolean;
+  /** Whether this pack is from the store (TOML-loaded) */
+  isStorePack?: boolean;
+  /** Original store pack ID (e.g. "free/pack1") */
+  storePackId?: string;
+  /** Price in coins (0 = free, >0 = paid) */
+  price?: number;
 }
 
 /**
@@ -58,6 +64,7 @@ export interface PackFormErrors {
 export interface QuestionError {
   text?: string;
   answers?: string;
+  correctAnswers?: string;
 }
 
 /**

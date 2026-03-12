@@ -5,9 +5,9 @@
 
 import { Response, NextFunction } from 'express';
 import notificationService from './notificationService';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { sendNotificationToUser } from '../../socket';
-import { AuthRequest } from '../../shared/types/index';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { getSocketRegistry } from '@/socket';
+import { AuthRequest } from '@shared/types/index';
 
 /**
  * Get user's notifications
@@ -110,7 +110,7 @@ export async function resolveAction(req: AuthRequest, res: Response, next: NextF
   try {
     const { action } = req.body;
     const notification = await notificationService.resolveAction(req.user.id, req.params.id, action);
-    sendNotificationToUser(req.user.id, notification);
+    getSocketRegistry()?.sendNotificationToUser(req.user.id, notification);
     res.json(successResponse(notification, 'Notification action resolved'));
   } catch (error) {
     next(error);
@@ -133,7 +133,9 @@ export async function sendRoomInvites(req: AuthRequest, res: Response, next: Nex
           roomTitle,
           packTitle
         );
-        sendNotificationToUser(recipientId, notification);
+        if (notification) {
+          getSocketRegistry()?.sendNotificationToUser(recipientId, notification);
+        }
         return notification;
       })
     );

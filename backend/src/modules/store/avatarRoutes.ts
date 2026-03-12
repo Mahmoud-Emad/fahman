@@ -4,9 +4,9 @@
  */
 
 import { Router } from 'express';
-import { authenticate, optionalAuth } from '../../shared/middleware/auth';
-import { validateUUID } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate, optionalAuth } from '@shared/middleware/auth';
+import { validateUUID } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import * as avatarController from './avatarController';
 
 const router = Router();

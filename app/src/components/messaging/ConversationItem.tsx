@@ -1,7 +1,7 @@
 /**
  * ConversationItem - Single conversation row component
  */
-import React from "react";
+import React, { memo } from "react";
 import { View } from "react-native";
 import { Text, Avatar, Pressable } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
@@ -17,7 +17,7 @@ interface ConversationItemProps {
 /**
  * ConversationItem component
  */
-export function ConversationItem({
+export const ConversationItem = memo(function ConversationItem({
   conversation,
   onPress,
 }: ConversationItemProps) {
@@ -104,4 +104,4 @@ export function ConversationItem({
       </View>
     </Pressable>
   );
-}
+});

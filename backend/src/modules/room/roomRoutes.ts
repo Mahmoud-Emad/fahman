@@ -4,9 +4,9 @@
 
 import express from 'express';
 import * as roomController from './roomController';
-import { authenticate } from '../../shared/middleware/auth';
-import { validate, validateUUID } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { validate, validateUUID } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import {
   createRoomSchema,
   updateRoomSchema,
@@ -14,6 +14,7 @@ import {
   joinRoomByCodeSchema,
   setReadySchema,
 } from './roomValidator';
+import { cacheResponse } from '@shared/middleware/cache';
 import gameRoutes from '../game/gameRoutes';
 
 const router = express.Router();
@@ -84,7 +85,7 @@ router.get('/', asyncHandler(roomController.getPublicRooms));
  *       200:
  *         description: List of popular rooms
  */
-router.get('/popular', asyncHandler(roomController.getPopularRooms));
+router.get('/popular', cacheResponse(30), asyncHandler(roomController.getPopularRooms));
 
 /**
  * @openapi

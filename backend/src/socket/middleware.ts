@@ -4,10 +4,11 @@
  */
 
 import { Socket } from 'socket.io';
-import { prisma } from '../config/database';
-import { verifyToken } from '../shared/utils/tokenUtils';
+import { prisma } from '@config/database';
+import { verifyToken } from '@shared/utils/tokenUtils';
 import { AuthenticatedSocket } from './types';
-import logger from '../shared/utils/logger';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
 /**
  * Authenticate socket connection using JWT token
@@ -56,7 +57,7 @@ export async function authenticateSocket(
     logger.info(`Socket authenticated: ${user.username} (${socket.id})`);
     next();
   } catch (error) {
-    logger.error(`Socket auth error: ${error instanceof Error ? error.message : error}`);
+    logger.error(`Socket auth error: ${getErrorMessage(error)}`);
     next(new Error('Invalid token'));
   }
 }

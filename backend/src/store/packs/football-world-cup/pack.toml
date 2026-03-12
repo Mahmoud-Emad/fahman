@@ -1,0 +1,53 @@
+[pack-info]
+id = "3cf28c88-2c52-488c-8627-b34e4b2f429e"
+name = "Football World Cup"
+description = "Test your knowledge of the greatest tournament in football history: the FIFA World Cup!"
+version = "1.0.0"
+author = "Fahman"
+cover = "./media/cover.png"
+text-hint = ""
+price = 0
+preview-questions = 3
+number-of-questions = 10
+category = "Sports"
+free = true
+
+[question1]
+question = "Which country won the FIFA World Cup in 2022?"
+answer = "Argentina"
+
+[question2]
+question = "Which country has won the most FIFA World Cups?"
+answer = "Brazil"
+
+[question3]
+question = "Who won the Golden Ball in the 2022 World Cup?"
+answer = "Lionel Messi"
+
+[question4]
+question = "Which country hosted the 2018 FIFA World Cup?"
+answer = "Russia"
+
+[question5]
+question = "Which country won the 2014 FIFA World Cup?"
+answer = "Germany"
+
+[question6]
+question = "Which country hosted the 2010 FIFA World Cup?"
+answer = "South Africa"
+
+[question7]
+question = "Who scored the famous 'Hand of God' goal in the 1986 World Cup?"
+answer = "Diego Maradona"
+
+[question8]
+question = "Which country won the first FIFA World Cup in 1930?"
+answer = "Uruguay"
+
+[question9]
+question = "Which country hosted the 2022 FIFA World Cup?"
+answer = "Qatar"
+
+[question10]
+question = "Which player has won the most FIFA World Cups?"
+answer = "Pele"

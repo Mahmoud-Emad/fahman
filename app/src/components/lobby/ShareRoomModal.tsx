@@ -8,6 +8,7 @@ import * as Clipboard from "expo-clipboard";
 import { Modal, Text, Icon, Button } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 interface ShareRoomModalProps {
   visible: boolean;
@@ -53,8 +54,8 @@ export function ShareRoomModal({
           title: "Join my Fahman Party Game room!",
         });
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to share");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -62,8 +63,8 @@ export function ShareRoomModal({
     try {
       await Clipboard.setStringAsync(shareMessage);
       toast.success("Room info copied to clipboard!");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to copy");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 

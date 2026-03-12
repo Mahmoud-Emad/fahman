@@ -1,7 +1,7 @@
 /**
  * RoomCard - Card component for displaying room information
  */
-import React from "react";
+import React, { memo } from "react";
 import { View, Pressable, Dimensions } from "react-native";
 import { Text, Icon, Avatar } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
@@ -97,7 +97,7 @@ interface RoomCardProps {
 /**
  * Room card component - Clean design with full info
  */
-export function RoomCard({ room, onPress }: RoomCardProps) {
+export const RoomCard = memo(function RoomCard({ room, onPress }: RoomCardProps) {
   const isPrivate = room.type === "private";
   const accent = getAccentColor(room.id);
   const questionStatus = getQuestionLabel(room);
@@ -188,4 +188,4 @@ export function RoomCard({ room, onPress }: RoomCardProps) {
       </View>
     </Pressable>
   );
-}
+});

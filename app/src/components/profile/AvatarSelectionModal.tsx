@@ -15,13 +15,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon } from "@/components/ui";
-import { avatarService, type AvatarImage, type AvatarAlbum } from "@/services/avatarService";
-import { storeService, type AvatarAlbum as StoreAlbum } from "@/services/storeService";
+import { storeService, type StoreItem, type AvatarAlbum } from "@/services/storeService";
 import { colors, withOpacity } from "@/themes";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { UI_TIMING } from "@/constants";
 import { useToast } from "@/contexts";
 import { AvatarGridItem } from "./AvatarGrid";
-import { CollectionAlbumCard, ShopAlbumCard, AvatarEmptyState } from "./AvatarAlbumSection";
+import { CollectionAlbumCard, AvatarEmptyState } from "./AvatarAlbumSection";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const PREVIEW_SIZE = 100;
@@ -31,11 +31,10 @@ interface AvatarSelectionModalProps {
   onClose: () => void;
   onSelect: (avatarUrl: string) => void;
   currentAvatar?: string | null;
-  userCoins?: number;
-  onBuyCoins?: () => void;
+  onOpenShop?: () => void;
 }
 
-type TabType = "collection" | "free" | "shop";
+type TabType = "collection" | "free";
 
 /**
  * Avatar selection modal with preview, tabs, and purchase flow
@@ -45,15 +44,13 @@ export function AvatarSelectionModal({
   onClose,
   onSelect,
   currentAvatar,
-  userCoins = 0,
-  onBuyCoins,
+  onOpenShop,
 }: AvatarSelectionModalProps) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<TabType>("collection");
-  const [freeAvatars, setFreeAvatars] = useState<AvatarImage[]>([]);
-  const [shopAlbums, setShopAlbums] = useState<AvatarAlbum[]>([]);
-  const [ownedAlbums, setOwnedAlbums] = useState<StoreAlbum[]>([]);
+  const [freeAvatars, setFreeAvatars] = useState<StoreItem[]>([]);
+  const [ownedAlbums, setOwnedAlbums] = useState<AvatarAlbum[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(currentAvatar || null);
   const [expandedAlbumId, setExpandedAlbumId] = useState<string | null>(null);
@@ -80,24 +77,17 @@ export function AvatarSelectionModal({
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [avatarResponse, storeResponse] = await Promise.all([
-        avatarService.getAllAvatars(),
-        storeService.getStoreData(),
-      ]);
+      const response = await storeService.getStoreData();
 
-      if (avatarResponse.success && avatarResponse.data) {
-        setFreeAvatars(avatarResponse.data.free);
-        const ownedIds = storeResponse.data?.avatars?.ownedAlbums?.map((a) => a.id) || [];
-        setShopAlbums(avatarResponse.data.albums.filter((a) => !ownedIds.includes(a.id) && !a.isOwned));
-      }
-
-      if (storeResponse.success && storeResponse.data) {
-        const owned = storeResponse.data.avatars.ownedAlbums || [];
+      if (response.success && response.data) {
+        const { avatars } = response.data;
+        setFreeAvatars(avatars.free || []);
+        const owned = avatars.ownedAlbums || [];
         setOwnedAlbums(owned);
         if (owned.length === 0) setActiveTab("free");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to load avatars");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -117,23 +107,9 @@ export function AvatarSelectionModal({
     }
   };
 
-  const handlePurchaseAlbum = async (album: AvatarAlbum) => {
-    if (userCoins < album.price) {
-      onBuyCoins?.();
-      return;
-    }
-    try {
-      const response = await storeService.purchaseAvatarAlbum(album.id);
-      if (response.success) loadData();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to purchase album");
-    }
-  };
-
   const tabs: { id: TabType; label: string; count?: number }[] = [
     { id: "collection", label: "My Collection", count: ownedAlbums.length },
     { id: "free", label: "Free", count: freeAvatars.length },
-    { id: "shop", label: "Shop", count: shopAlbums.length },
   ];
 
   const hasSelection = selectedUrl && selectedUrl !== currentAvatar;
@@ -258,6 +234,23 @@ export function AvatarSelectionModal({
                   </Text>
                 </Pressable>
               ))}
+              {/* Shop button — opens the store dialog */}
+              <Pressable
+                onPress={onOpenShop}
+                delayPressIn={0}
+                className="flex-1 py-2.5 rounded-lg items-center"
+              >
+                <View className="flex-row items-center">
+                  <Icon name="cart-outline" customSize={14} color={colors.primary[500]} />
+                  <Text
+                    variant="body-sm"
+                    className="ml-1"
+                    style={{ color: colors.primary[500] }}
+                  >
+                    Shop
+                  </Text>
+                </View>
+              </Pressable>
             </View>
           </View>
 
@@ -291,7 +284,7 @@ export function AvatarSelectionModal({
                   title="No Albums Yet"
                   subtitle="Purchase avatar albums from the shop to build your collection"
                   actionLabel="Browse Shop"
-                  onAction={() => setActiveTab("shop")}
+                  onAction={onOpenShop}
                 />
               )
             ) : activeTab === "free" ? (
@@ -316,23 +309,7 @@ export function AvatarSelectionModal({
                   subtitle="Check back later for free avatar drops"
                 />
               )
-            ) : shopAlbums.length > 0 ? (
-              shopAlbums.map((album) => (
-                <ShopAlbumCard
-                  key={album.id}
-                  album={album}
-                  onPurchase={() => handlePurchaseAlbum(album)}
-                  onBuyCoins={() => onBuyCoins?.()}
-                  userCoins={userCoins}
-                />
-              ))
-            ) : (
-              <AvatarEmptyState
-                icon="checkmark-circle"
-                title="All Unlocked!"
-                subtitle="You've unlocked all available avatar albums"
-              />
-            )}
+            ) : null}
           </ScrollView>
 
           {/* Confirm Button */}

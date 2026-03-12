@@ -1,14 +1,13 @@
 /**
  * Welcome Screen - Splash screen displayed on app launch
- * Shows the app name/logo for a brief moment before transitioning to Home
+ * Shows connection error with retry when server is unreachable
  */
-import React, { useEffect, useRef, useMemo } from "react";
-import { View, Animated, Image } from "react-native";
+import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import { View, Animated, Image, Pressable } from "react-native";
 import { Text, Icon } from "@/components/ui";
 import { DecoCircle } from "@/components/decorative";
 import { colors, withOpacity } from "@/themes";
-import { api } from "@/services/api";
-import { useToast } from "@/contexts";
+import { useAuth } from "@/contexts";
 
 /**
  * Tips to display randomly on the welcome screen
@@ -44,7 +43,11 @@ export function WelcomeScreen({ onComplete, duration = 3000 }: WelcomeScreenProp
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const tipFadeAnim = useRef(new Animated.Value(0)).current;
   const tipSlideAnim = useRef(new Animated.Value(30)).current;
-  const { showToast } = useToast();
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
+  const hasProceeded = useRef(false);
+
+  const { isInitializing, connectionError, reinitialize } = useAuth();
 
   // Select a random tip on mount
   const randomTip = useMemo(() => {
@@ -52,76 +55,59 @@ export function WelcomeScreen({ onComplete, duration = 3000 }: WelcomeScreenProp
     return TIPS[index];
   }, []);
 
-  // Health check on mount — warn user if server is unreachable
-  useEffect(() => {
-    api.checkHealth().then(({ connected }) => {
-      if (!connected) {
-        showToast({
-          message: 'Unable to connect to server',
-          variant: 'error',
-          duration: 5000,
-        });
-      }
-    });
-  }, [showToast]);
-
-  useEffect(() => {
-    // Main content fade in animation
+  const proceedToApp = useCallback(() => {
+    if (hasProceeded.current) return;
+    hasProceeded.current = true;
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(tipFadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => onComplete());
+  }, [fadeAnim, tipFadeAnim, onComplete]);
+
+  const handleRetry = useCallback(async () => {
+    setIsRetrying(true);
+    await reinitialize();
+    setIsRetrying(false);
+  }, [reinitialize]);
+
+  // Animate in on mount + splash timer
+  useEffect(() => {
+    hasProceeded.current = false;
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }),
     ]).start();
 
-    // Tip animation - delayed slide up and fade in
     const tipTimer = setTimeout(() => {
       Animated.parallel([
-        Animated.timing(tipFadeAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(tipSlideAnim, {
-          toValue: 0,
-          friction: 8,
-          tension: 50,
-          useNativeDriver: true,
-        }),
+        Animated.timing(tipFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(tipSlideAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true }),
       ]).start();
     }, 600);
 
-    // Trigger completion after duration
-    const timer = setTimeout(() => {
-      // Fade out before completing
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(tipFadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        onComplete();
-      });
-    }, duration - 300);
+    // Mark splash as done after minimum duration
+    const splashTimer = setTimeout(() => setSplashDone(true), duration - 300);
 
     return () => {
-      clearTimeout(timer);
       clearTimeout(tipTimer);
+      clearTimeout(splashTimer);
     };
-  }, [fadeAnim, scaleAnim, tipFadeAnim, tipSlideAnim, duration, onComplete]);
+  }, [fadeAnim, scaleAnim, tipFadeAnim, tipSlideAnim, duration]);
+
+  // Decide what to do when both splash is done AND auth finished initializing
+  useEffect(() => {
+    if (!splashDone || isInitializing || hasProceeded.current) return;
+
+    // If no connection error, proceed to app (login or home depending on auth state)
+    if (!connectionError) {
+      proceedToApp();
+    }
+    // If there IS a connectionError, we stay here and show the error UI
+  }, [splashDone, isInitializing, connectionError, proceedToApp]);
+
+  // Show error state: splash done + not initializing + has connection error
+  const showError = splashDone && !isInitializing && !!connectionError;
 
   return (
     <View
@@ -181,7 +167,7 @@ export function WelcomeScreen({ onComplete, duration = 3000 }: WelcomeScreenProp
         />
       </Animated.View>
 
-      {/* Tip Section - Animated separately */}
+      {/* Bottom Section - Error or Tip */}
       <Animated.View
         className="absolute bottom-16 left-6 right-6"
         style={{
@@ -189,44 +175,104 @@ export function WelcomeScreen({ onComplete, duration = 3000 }: WelcomeScreenProp
           transform: [{ translateY: tipSlideAnim }],
         }}
       >
-        <View
-          className="flex-row items-center px-4 py-3 rounded-2xl"
-          style={{
-            backgroundColor: withOpacity(colors.white, 0.15),
-            borderWidth: 1,
-            borderColor: withOpacity(colors.white, 0.2),
-          }}
-        >
+        {showError ? (
           <View
-            className="w-8 h-8 rounded-full items-center justify-center mr-3"
-            style={{ backgroundColor: withOpacity(colors.white, 0.2) }}
+            className="items-center px-4 py-5 rounded-2xl"
+            style={{
+              backgroundColor: withOpacity(colors.white, 0.2),
+              borderWidth: 1,
+              borderColor: withOpacity(colors.white, 0.3),
+            }}
           >
-            <Icon name="flash" customSize={18} color={colors.white} />
-          </View>
-          <View className="flex-1">
+            <View
+              className="w-10 h-10 rounded-full items-center justify-center mb-3"
+              style={{ backgroundColor: withOpacity(colors.error, 0.2) }}
+            >
+              <Icon name="cloud-offline" customSize={22} color={colors.white} />
+            </View>
             <Text
               style={{
-                fontSize: 11,
+                fontSize: 15,
                 fontWeight: "700",
-                color: withOpacity(colors.white, 0.7),
-                letterSpacing: 1,
-                marginBottom: 2,
+                color: colors.white,
+                marginBottom: 4,
               }}
             >
-              TIP
+              No Connection
             </Text>
             <Text
               style={{
                 fontSize: 13,
-                fontWeight: "500",
-                color: colors.white,
+                fontWeight: "400",
+                color: withOpacity(colors.white, 0.8),
+                textAlign: "center",
                 lineHeight: 18,
+                marginBottom: 12,
               }}
             >
-              {randomTip}
+              Unable to reach the server. Please check your internet connection and try again.
             </Text>
+            <Pressable
+              onPress={handleRetry}
+              disabled={isRetrying}
+              delayPressIn={0}
+              className="px-6 py-2.5 rounded-full active:opacity-80"
+              style={{
+                backgroundColor: colors.white,
+                opacity: isRetrying ? 0.6 : 1,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "600",
+                  color: colors.primary[500],
+                }}
+              >
+                {isRetrying ? "Retrying..." : "Retry"}
+              </Text>
+            </Pressable>
           </View>
-        </View>
+        ) : (
+          <View
+            className="flex-row items-center px-4 py-3 rounded-2xl"
+            style={{
+              backgroundColor: withOpacity(colors.white, 0.15),
+              borderWidth: 1,
+              borderColor: withOpacity(colors.white, 0.2),
+            }}
+          >
+            <View
+              className="w-8 h-8 rounded-full items-center justify-center mr-3"
+              style={{ backgroundColor: withOpacity(colors.white, 0.2) }}
+            >
+              <Icon name="flash" customSize={18} color={colors.white} />
+            </View>
+            <View className="flex-1">
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "700",
+                  color: withOpacity(colors.white, 0.7),
+                  letterSpacing: 1,
+                  marginBottom: 2,
+                }}
+              >
+                TIP
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "500",
+                  color: colors.white,
+                  lineHeight: 18,
+                }}
+              >
+                {randomTip}
+              </Text>
+            </View>
+          </View>
+        )}
       </Animated.View>
     </View>
   );

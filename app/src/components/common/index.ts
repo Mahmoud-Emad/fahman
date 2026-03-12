@@ -6,4 +6,4 @@ export { LogoPlaceholder, type LogoPlaceholderProps } from "./LogoPlaceholder";
 export { LeaveConfirmDialog } from "./LeaveConfirmDialog";
 export { CreateOptionsModal } from "./CreateOptionsModal";
 export { CoinsModal } from "./CoinsModal";
-export { BuyCoinsModal } from "./BuyCoinsModal";
+export { BuyCoinsModal, type PurchasePlatform } from "./BuyCoinsModal";

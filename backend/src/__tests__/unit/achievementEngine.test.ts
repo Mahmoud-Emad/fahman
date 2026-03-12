@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { evaluateCondition, type UserStats } from '../../modules/game/achievementEngine';
+import { evaluateCondition, type UserStats } from '@modules/game/achievementEngine';
 
 const baseStats: UserStats = {
   rooms_joined: 0,

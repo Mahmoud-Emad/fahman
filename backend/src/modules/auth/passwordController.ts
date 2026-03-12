@@ -4,12 +4,12 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../../config/database';
-import { hashPassword } from '../../shared/utils/passwordUtils';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { ValidationError, NotFoundError } from '../../shared/utils/errors';
-import logger from '../../shared/utils/logger';
-import { config } from '../../config/env';
+import { prisma } from '@config/database';
+import { hashPassword, comparePassword } from '@shared/utils/passwordUtils';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { ValidationError, NotFoundError } from '@shared/utils/errors';
+import logger from '@shared/utils/logger';
+import { config } from '@config/env';
 import { generateVerificationCode } from './authService';
 
 /**
@@ -35,17 +35,18 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     }
 
     const code = generateVerificationCode();
+    const codeHash = await hashPassword(code);
     const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        phoneVerificationCode: code,
+        phoneVerificationCode: codeHash,
         phoneVerificationExpiry: expiry,
       },
     });
 
-    logger.info(`Password reset code for ${email}: ${code}`);
+    logger.info(`Password reset code sent for ${email}`);
 
     res.json(
       successResponse(
@@ -83,7 +84,8 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
       throw new ValidationError('Reset code has expired. Please request a new code.');
     }
 
-    if (user.phoneVerificationCode !== code) {
+    const isValid = await comparePassword(code, user.phoneVerificationCode);
+    if (!isValid) {
       throw new ValidationError('Invalid reset code');
     }
 

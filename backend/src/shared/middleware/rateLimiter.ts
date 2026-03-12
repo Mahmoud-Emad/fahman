@@ -4,7 +4,7 @@
  */
 
 import rateLimit from 'express-rate-limit';
-import { config } from '../../config/env';
+import { config } from '@config/env';
 
 // General rate limiter for most routes
 export const generalLimiter = rateLimit({

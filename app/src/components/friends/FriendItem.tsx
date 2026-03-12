@@ -1,7 +1,7 @@
 /**
  * FriendItem - Single friend row in friends list
  */
-import React from "react";
+import React, { memo } from "react";
 import { View, Pressable } from "react-native";
 import { Text, Icon, Avatar } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
@@ -48,7 +48,7 @@ function formatLastSeen(date?: Date): string {
 /**
  * FriendItem component
  */
-export function FriendItem({ friend, onPress, onMessage, onInvite }: FriendItemProps) {
+export const FriendItem = memo(function FriendItem({ friend, onPress, onMessage, onInvite }: FriendItemProps) {
   const statusInfo = getStatusInfo(friend.status);
   const showLastSeen = friend.status === "offline" && friend.lastSeen;
 
@@ -133,7 +133,7 @@ export function FriendItem({ friend, onPress, onMessage, onInvite }: FriendItemP
       </View>
     </Pressable>
   );
-}
+});
 
 /**
  * Friend Request Item
@@ -157,7 +157,7 @@ interface FriendRequestItemProps {
   onViewProfile?: (userId: string) => void;
 }
 
-export function FriendRequestItem({
+export const FriendRequestItem = memo(function FriendRequestItem({
   request,
   isSent = false,
   onAccept,
@@ -228,4 +228,4 @@ export function FriendRequestItem({
       )}
     </Pressable>
   );
-}
+});

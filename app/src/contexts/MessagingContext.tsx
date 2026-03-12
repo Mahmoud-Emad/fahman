@@ -22,6 +22,7 @@ import type {
   RoomInviteData,
 } from "@/components/messaging/types";
 import { UI_TIMING } from "@/constants";
+import { getErrorMessage } from "@/utils/errorUtils";
 import {
   buildRoomDataFromNotification,
   buildRoomDataFromChatInvite,
@@ -561,8 +562,8 @@ export function MessagingProvider({
           )
         );
 
-        const handleError = (error: any) => {
-          const errorMessage = error?.message || "Failed to process request";
+        const handleError = (error: unknown) => {
+          const errorMessage = getErrorMessage(error);
           // Revert optimistic update on error
           setNotifications((prev) =>
             prev.map((n) =>
@@ -571,7 +572,7 @@ export function MessagingProvider({
                 : n
             )
           );
-          if (errorMessage.includes("not found") || error?.status === 404) {
+          if (errorMessage.includes("not found")) {
             setNotifications((prev) =>
               prev.filter((n) => n.id !== notification.id)
             );
@@ -615,7 +616,7 @@ export function MessagingProvider({
               );
               toast.info("This request is no longer available");
             }
-          } catch (error: any) {
+          } catch (error) {
             handleError(error);
           }
           return;
@@ -631,7 +632,7 @@ export function MessagingProvider({
           } else if (action === "decline") {
             await friendsService.declineFriendRequest(friendshipId);
           }
-        } catch (error: any) {
+        } catch (error) {
           handleError(error);
         }
       }
@@ -647,7 +648,7 @@ export function MessagingProvider({
           prev.map((n) => ({ ...n, isRead: true }))
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       // Silent fail
     }
   }, []);
@@ -662,7 +663,7 @@ export function MessagingProvider({
             prev.filter((n) => n.id !== notificationId)
           );
         }
-      } catch (error: any) {
+      } catch (error) {
         // Silent fail
       }
     },
@@ -675,7 +676,7 @@ export function MessagingProvider({
       if (response.success) {
         setNotifications((prev) => prev.filter((n) => !n.isRead));
       }
-    } catch (error: any) {
+    } catch (error) {
       // Silent fail
     }
   }, []);
@@ -772,6 +773,12 @@ export function MessagingProvider({
     }, UI_TIMING.MODAL_TRANSITION_DELAY);
   }, []);
 
+  // Ref to avoid stale closure over conversations in openDirectChat
+  const conversationsRef = useRef(conversations);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
   const openDirectChat = useCallback(
     async (friend: {
       id: string;
@@ -779,7 +786,7 @@ export function MessagingProvider({
       initials: string;
       avatar?: string;
     }) => {
-      const existing = conversations.find((c) => c.otherId === friend.id);
+      const existing = conversationsRef.current.find((c) => c.otherId === friend.id);
       const conversation: Conversation = existing || {
         id: friend.id,
         otherId: friend.id,
@@ -800,7 +807,7 @@ export function MessagingProvider({
       setChatDetailsVisible(true);
       await loadMessagesForConversation(conversation);
     },
-    [conversations, loadMessagesForConversation]
+    [loadMessagesForConversation]
   );
 
   // ============================================

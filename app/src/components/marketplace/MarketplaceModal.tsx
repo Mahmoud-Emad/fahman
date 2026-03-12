@@ -5,10 +5,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, Pressable, Animated, Dimensions, Modal as RNModal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Text, Icon, Button } from "@/components/ui";
+import { Text, Icon, Button, type IconName } from "@/components/ui";
 import { BuyCoinsModal } from "@/components/common";
 import { storeService, type StoreData, type AvatarAlbum, type StoreItem, type SoundItem, type StorePackPreview } from "@/services/storeService";
 import { colors, withOpacity } from "@/themes";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { MODAL_SIZES } from "@/constants";
 import { useToast } from "@/contexts";
 import { AvatarsTab } from "./AvatarShopTab";
@@ -73,8 +74,8 @@ export function MarketplaceModal({
       } else {
         setError(response.message || "Failed to load store");
       }
-    } catch (err: any) {
-      setError(err?.message || "Failed to load store");
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +109,7 @@ export function MarketplaceModal({
     else setBuyCoinsVisible(true);
   };
 
-  const handleCoinsPurchased = (packageId: string) => {
+  const handleCoinsPurchased = (packageId: string, _receiptToken: string, _platform: string) => {
     const coinsMap: Record<string, number> = { pack_50: 50, pack_150: 150, pack_500: 500 };
     const newBalance = localCoins + (coinsMap[packageId] || 0);
     setLocalCoins(newBalance);
@@ -125,8 +126,8 @@ export function MarketplaceModal({
         onCoinsUpdated?.(newBalance);
         fetchStoreData();
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to purchase album");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -142,30 +143,29 @@ export function MarketplaceModal({
         setPreviewSound(null);
         fetchStoreData();
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to purchase sound");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
   const handlePackPurchase = async () => {
     if (!previewPack) return;
-    if (localCoins < previewPack.price) { handleBuyCoins(); return; }
+    if (previewPack.price > 0 && localCoins < previewPack.price) { handleBuyCoins(); return; }
     try {
       const response = await storeService.purchasePack(previewPack.id);
-      if (response.success) {
-        const newBalance = localCoins - previewPack.price;
-        setLocalCoins(newBalance);
-        onCoinsUpdated?.(newBalance);
+      if (response.success && response.data) {
+        setLocalCoins(response.data.newBalance);
+        onCoinsUpdated?.(response.data.newBalance);
         setPreviewPack(null);
-        toast.success("Pack purchased!");
+        toast.success("Pack added!");
         fetchStoreData();
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to purchase pack");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
-  const categories: { id: CategoryType; label: string; icon: string }[] = [
+  const categories: { id: CategoryType; label: string; icon: IconName }[] = [
     { id: "avatars", label: "Avatars", icon: "person-circle" },
     { id: "sounds", label: "Sounds", icon: "musical-notes" },
     { id: "packs", label: "Packs", icon: "albums" },
@@ -211,7 +211,7 @@ export function MarketplaceModal({
             <View className="flex-row p-1 rounded-xl" style={{ backgroundColor: colors.neutral[100] }}>
               {categories.map((cat) => (
                 <Pressable key={cat.id} onPress={() => setActiveCategory(cat.id)} delayPressIn={0} className="flex-1 flex-row items-center justify-center py-2.5 rounded-lg" style={{ backgroundColor: activeCategory === cat.id ? colors.white : "transparent" }}>
-                  <Icon name={cat.icon as any} size="sm" color={activeCategory === cat.id ? colors.primary[500] : colors.neutral[500]} />
+                  <Icon name={cat.icon} size="sm" color={activeCategory === cat.id ? colors.primary[500] : colors.neutral[500]} />
                   <Text variant="body-sm" className={`ml-1.5 ${activeCategory === cat.id ? "font-semibold" : ""}`} style={{ color: activeCategory === cat.id ? colors.primary[500] : colors.neutral[500] }}>
                     {cat.label}
                   </Text>

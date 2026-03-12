@@ -53,9 +53,16 @@ app.use(
 );
 
 // CORS configuration
+const allowedOrigins = config.cors.origins;
 app.use(
   cors({
-    origin: config.cors.origin,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   })
 );
@@ -71,7 +78,7 @@ app.use('/uploads', express.static(join(__dirname, 'uploads'), {
 }));
 
 // Serve store files (avatars, sounds from marketplace)
-app.use('/store', express.static(join(__dirname, 'store'), {
+app.use('/static/store', express.static(join(__dirname, 'store'), {
   maxAge: '30d', // Cache store items for 30 days
   etag: true,
 }));

@@ -6,8 +6,8 @@
 import { Response, NextFunction } from 'express';
 import gameService from './gameService';
 import gameResultsService from './gameResultsService';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { AuthRequest } from '../../shared/types/index';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { AuthRequest } from '@shared/types/index';
 
 /**
  * Get current game state
@@ -26,11 +26,10 @@ export async function getGameState(req: AuthRequest, res: Response, next: NextFu
  */
 export async function submitAnswer(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { answer, betAmount, timeRemaining } = req.body;
+    const { answer, betAmount } = req.body;
     const result = await gameService.submitAnswer(req.params.id, req.user.id, {
       answer,
       betAmount,
-      timeRemaining,
     });
     res.json(successResponse(result, result.isCorrect ? 'Correct!' : 'Wrong answer'));
   } catch (error) {

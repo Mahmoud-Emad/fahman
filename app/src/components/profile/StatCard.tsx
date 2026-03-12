@@ -3,13 +3,13 @@
  */
 import React from "react";
 import { View } from "react-native";
-import { Text, Icon } from "@/components/ui";
+import { Text, Icon, type IconName } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 
 interface StatCardProps {
   label: string;
   value: string | number;
-  icon: string;
+  icon: IconName;
   color: string;
 }
 
@@ -23,7 +23,7 @@ export function StatCard({ label, value, icon, color }: StatCardProps) {
         className="w-10 h-10 rounded-full items-center justify-center mb-2"
         style={{ backgroundColor: withOpacity(color, 0.15) }}
       >
-        <Icon name={icon as any} size="sm" color={color} />
+        <Icon name={icon} size="sm" color={color} />
       </View>
       <Text variant="h3" style={{ color: colors.neutral[900] }}>
         {value}

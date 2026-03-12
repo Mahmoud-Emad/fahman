@@ -12,6 +12,7 @@ import {
   Animated,
   Dimensions,
   Modal as RNModal,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon, Button } from "@/components/ui";
@@ -34,11 +35,13 @@ const COIN_PACKAGES: CoinPackage[] = [
   { id: "pack_500", coins: 500, price: 250, currency: "EGP", bestValue: true },
 ];
 
+export type PurchasePlatform = 'ios' | 'android' | 'web';
+
 interface BuyCoinsModalProps {
   visible: boolean;
   onClose: () => void;
   currentCoins: number;
-  onPurchase?: (packageId: string) => void;
+  onPurchase?: (packageId: string, receiptToken: string, platform: PurchasePlatform) => void;
 }
 
 /**
@@ -185,11 +188,27 @@ export function BuyCoinsModal({
   };
 
   const handlePurchase = async () => {
-    if (!onPurchase) return;
+    if (!onPurchase || isPurchasing) return;
 
     setIsPurchasing(true);
-    await onPurchase(selectedPackage);
-    setIsPurchasing(false);
+    try {
+      const platform: PurchasePlatform =
+        Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
+
+      let receiptToken: string;
+
+      if (platform === 'ios' || platform === 'android') {
+        // TODO: Replace with real IAP receipt from expo-in-app-purchases
+        // once production IAP is configured. For now, use dev receipt.
+        receiptToken = `dev_receipt_${Date.now()}`;
+      } else {
+        receiptToken = `dev_receipt_${Date.now()}`;
+      }
+
+      await onPurchase(selectedPackage, receiptToken, platform);
+    } finally {
+      setIsPurchasing(false);
+    }
   };
 
   const selectedPkg = COIN_PACKAGES.find((p) => p.id === selectedPackage);

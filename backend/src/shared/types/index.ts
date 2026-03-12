@@ -19,6 +19,9 @@ export interface AuthUser {
 export interface JWTPayload {
   userId: string;
   role: Role;
+  jti?: string;
+  iat?: number;
+  exp?: number;
 }
 
 // Extended Express Request with authenticated user

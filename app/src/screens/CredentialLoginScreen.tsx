@@ -10,6 +10,7 @@ import type { StackNavigationProp } from "@react-navigation/stack";
 import { Text, Icon } from "@/components/ui";
 import { colors } from "@/themes";
 import { useAuth } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { CredentialLoginForm, type LoginType, type AuthMode, type FormErrors, type LoginConfig } from "@/components/auth/CredentialLoginForm";
 import type { RootStackParamList } from "../../App";
 
@@ -144,10 +145,9 @@ export function CredentialLoginScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const isNetworkError = (error: any): boolean => {
+  const isNetworkError = (error: unknown): boolean => {
     if (error instanceof TypeError) return true;
-    if (error.name === "TypeError" || error.name === "AbortError") return true;
-    const message = (error.message || "").toLowerCase();
+    const message = getErrorMessage(error).toLowerCase();
     return (
       message.includes("network") ||
       message.includes("fetch") ||
@@ -158,12 +158,12 @@ export function CredentialLoginScreen() {
     );
   };
 
-  const handleError = (error: any) => {
+  const handleError = (error: unknown) => {
     if (isNetworkError(error)) {
       setErrors({ identifier: "Network error. Please try again." });
       return;
     }
-    const message = error.message || error.error || "An error occurred. Please try again.";
+    const message = getErrorMessage(error);
     const lowerMessage = message.toLowerCase();
     if (lowerMessage.includes("name")) {
       setErrors({ fullName: message });
@@ -208,7 +208,7 @@ export function CredentialLoginScreen() {
             break;
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       handleError(error);
       setSubmitting(false);
     }

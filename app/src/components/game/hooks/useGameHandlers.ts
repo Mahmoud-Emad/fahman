@@ -1,7 +1,7 @@
 /**
  * useGameHandlers - Game action handlers wired to socket emissions
  */
-import { useCallback, useState } from "react";
+import { useCallback, useState, type MutableRefObject } from "react";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { Player, ChatMessage, GamePhase, RoomSettings } from "../types";
@@ -10,6 +10,7 @@ import { socketService } from "@/services/socketService";
 import { roomsService } from "@/services/roomsService";
 import { friendsService } from "@/services/friendsService";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "RoomDetails">;
 
@@ -31,6 +32,9 @@ interface UseGameHandlersOptions {
   setUsedBets: (updater: (prev: number[]) => number[]) => void;
   setPlayers: (updater: (prev: Player[]) => Player[]) => void;
   setMessages: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void;
+
+  // Guard ref to prevent double navigation on leave
+  hasLeftRoom: MutableRefObject<boolean>;
 
   // Messaging callbacks (optional)
   onOpenNotifications?: () => void;
@@ -61,6 +65,7 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
     setUsedBets,
     setPlayers,
     setMessages,
+    hasLeftRoom,
     onOpenNotifications,
     onOpenChatsList,
     onOpenFriendsList,
@@ -70,12 +75,12 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
   const handleSubmitAnswer = useCallback(() => {
     if (!selectedAnswer.trim() || selectedBet === null || hasSubmitted) return;
 
-    socketService.submitAnswer(roomId, selectedAnswer.trim(), selectedBet, timeLeft);
+    socketService.submitAnswer(roomId, selectedAnswer.trim(), selectedBet);
     setHasSubmitted(true);
 
     // Track used bet
     setUsedBets((prev) => [...prev, selectedBet]);
-  }, [roomId, selectedAnswer, selectedBet, hasSubmitted, timeLeft, setHasSubmitted, setUsedBets]);
+  }, [roomId, selectedAnswer, selectedBet, hasSubmitted, setHasSubmitted, setUsedBets]);
 
   // Handle next question — host emits to server
   const handleNextQuestion = useCallback(() => {
@@ -136,8 +141,8 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
           } else {
             toast.error(response.message || "Failed to send request");
           }
-        } catch (error: any) {
-          toast.error(error.message || "Failed to send friend request");
+        } catch (error) {
+          toast.error(getErrorMessage(error));
         }
         return;
       }
@@ -173,8 +178,8 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
       } else {
         toast.error(response.message || "Failed to remove friend");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to remove friend");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setRemoveFriendConfirm({ visible: false, playerId: null });
     }
@@ -187,6 +192,8 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
 
   // Handle leave room — call REST API then navigate home
   const handleLeaveRoom = useCallback(async () => {
+    if (hasLeftRoom.current) return;
+    hasLeftRoom.current = true;
     setShowLeaveDialog(false);
     try {
       await roomsService.leaveRoom(roomId);
@@ -194,7 +201,7 @@ export function useGameHandlers(options: UseGameHandlersOptions) {
       // Leave silently — navigation proceeds regardless
     }
     navigation.reset({ index: 0, routes: [{ name: "Home" }] });
-  }, [roomId, navigation, setShowLeaveDialog]);
+  }, [roomId, navigation, setShowLeaveDialog, hasLeftRoom]);
 
   // Handle bottom nav tab press
   const handleBottomTabPress = useCallback(

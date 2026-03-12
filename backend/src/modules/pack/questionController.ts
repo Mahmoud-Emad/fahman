@@ -4,8 +4,8 @@
 
 import { Response, NextFunction } from 'express';
 import questionService from './questionService';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { AuthRequest } from '../../shared/types/index';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { AuthRequest } from '@shared/types/index';
 
 export async function createQuestion(req: AuthRequest, res: Response, next: NextFunction) {
   try {

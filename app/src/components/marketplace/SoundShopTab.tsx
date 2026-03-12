@@ -9,6 +9,7 @@ import { Text, Icon, Button } from "@/components/ui";
 import { type SoundSection, type SoundItem } from "@/services/storeService";
 import { colors, withOpacity } from "@/themes";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { SectionHeader } from "./AvatarShopTab";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -174,8 +175,8 @@ export function SoundPreviewModal({ visible, sound, userCoins, onClose, onPurcha
         setIsPlaying(true);
         setIsLoading(false);
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to play sound");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
       setIsLoading(false);
       setIsPlaying(false);
     }

@@ -1,0 +1,133 @@
+[pack-info]
+name = "Legendary Movie Quotes"
+description = "Only true movie fans can recognize these legendary quotes. Can you guess the movie?"
+version = "1.0.0"
+id = "a15907c2-234c-483b-b294-f5d8cc09a000"
+author = "Fahman"
+cover = "./media/cover.png"
+text-hint = "Guess the movie from the quote"
+price = 50
+preview-questions = 3
+number-of-questions = 30
+category = "Movies"
+free = false
+
+[question1]
+question = "Why so serious?"
+answer = "The Dark Knight"
+
+[question2]
+question = "I am your father"
+answer = "Star Wars"
+
+[question3]
+question = "Say hello to my little friend"
+answer = "Scarface"
+
+[question4]
+question = "I'll be back"
+answer = "The Terminator"
+
+[question5]
+question = "Here's looking at you, kid"
+answer = "Casablanca"
+
+[question6]
+question = "You can't handle the truth"
+answer = "A Few Good Men"
+
+[question7]
+question = "My precious"
+answer = "The Lord of the Rings"
+
+[question8]
+question = "Houston, we have a problem"
+answer = "Apollo 13"
+
+[question9]
+question = "To infinity and beyond"
+answer = "Toy Story"
+
+[question10]
+question = "I'm the king of the world"
+answer = "Titanic"
+
+[question11]
+question = "Just keep swimming"
+answer = "Finding Nemo"
+
+[question12]
+question = "Life is like a box of chocolates"
+answer = "Forrest Gump"
+
+[question13]
+question = "I see dead people"
+answer = "The Sixth Sense"
+
+[question14]
+question = "You talking to me?"
+answer = "Taxi Driver"
+
+[question15]
+question = "May the Force be with you"
+answer = "Star Wars"
+
+[question16]
+question = "I'm gonna make him an offer he can't refuse"
+answer = "The Godfather"
+
+[question17]
+question = "Roads? Where we're going we don't need roads"
+answer = "Back to the Future"
+
+[question18]
+question = "Say my name"
+answer = "Breaking Bad"
+
+[question19]
+question = "Bond, James Bond"
+answer = "James Bond"
+
+[question20]
+question = "Wakanda forever"
+answer = "Black Panther"
+
+[question21]
+question = "I'm walking here!"
+answer = "Midnight Cowboy"
+
+[question22]
+question = "They may take our lives, but they'll never take our freedom"
+answer = "Braveheart"
+
+[question23]
+question = "I feel the need, the need for speed"
+answer = "Top Gun"
+
+[question24]
+question = "Nobody puts Baby in a corner"
+answer = "Dirty Dancing"
+
+[question25]
+question = "With great power comes great responsibility"
+answer = "Spider-Man"
+
+[question26]
+question = "You're gonna need a bigger boat"
+answer = "Jaws"
+
+[question27]
+question = "I'm the king of the world"
+answer = "Titanic"
+
+[question28]
+question = "I'm Batman"
+answer = "Batman"
+
+[question29]
+question = "Why did it have to be snakes?"
+answer = "Indiana Jones"
+
+[question30]
+question = "This is Sparta!"
+answer = "300"

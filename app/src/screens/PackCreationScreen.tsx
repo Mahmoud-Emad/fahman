@@ -2,7 +2,7 @@
  * PackCreationScreen - Create or edit a question pack
  * Features: Pack info form, question management with accordion panels
  */
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   ScrollView,
@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
@@ -27,6 +28,7 @@ import type {
 import { packsService, type CreateQuestionData } from "@/services/packsService";
 import { uploadService } from "@/services/uploadService";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { colors } from "@/themes";
 import { transformUrl } from "@/utils/transformUrl";
 import { PACK_LIMITS } from "@/constants";
@@ -73,7 +75,25 @@ export function PackCreationScreen() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoadingPack, setIsLoadingPack] = useState(isEditing);
 
+  const savedSuccessfully = useRef(false);
+
   const { pickImage } = useImagePicker();
+
+  // Warn about unsaved changes when navigating away
+  useEffect(() => {
+    const hasChanges = formData.title.trim().length > 0 || formData.questions.length > 0;
+    if (!hasChanges || savedSuccessfully.current) return;
+
+    const unsub = navigation.addListener('beforeRemove', (e) => {
+      if (savedSuccessfully.current) return;
+      e.preventDefault();
+      Alert.alert('Discard changes?', 'You have unsaved work.', [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+      ]);
+    });
+    return unsub;
+  }, [navigation, formData.title, formData.questions.length]);
 
   useEffect(() => {
     const loadPackData = async () => {
@@ -99,8 +119,8 @@ export function PackCreationScreen() {
             })),
           });
         }
-      } catch (error: any) {
-        toast.error(error.message || "Failed to load pack data");
+      } catch (error) {
+        toast.error(getErrorMessage(error));
         setApiError("Failed to load pack data");
       } finally {
         setIsLoadingPack(false);
@@ -198,7 +218,7 @@ export function PackCreationScreen() {
     if (uri) updateQuestion(questionId, { imageUri: uri });
   };
 
-  const validateForm = (): boolean => {
+  const validateForm = (): { hasErrors: boolean; errors: PackFormErrors } => {
     const newErrors: PackFormErrors = { questionErrors: {} };
 
     if (!formData.title.trim()) {
@@ -221,7 +241,10 @@ export function PackCreationScreen() {
       const qErrors: QuestionError = {};
       if (!question.text.trim()) qErrors.text = "Question text is required";
       if (question.answers.length < PACK_LIMITS.MIN_ANSWERS_PER_QUESTION) {
-        qErrors.answers = "At least one correct answer is required";
+        qErrors.answers = "At least one answer is required";
+      }
+      if (question.correctAnswerIndices.length === 0) {
+        qErrors.correctAnswers = "Please select at least one correct answer";
       }
       if (Object.keys(qErrors).length > 0) {
         newErrors.questionErrors[question.id] = qErrors;
@@ -229,13 +252,15 @@ export function PackCreationScreen() {
     });
 
     setErrors(newErrors);
-    return !newErrors.title && !newErrors.description && !newErrors.questions &&
-      Object.keys(newErrors.questionErrors).length === 0;
+    const hasErrors = !!(newErrors.title || newErrors.description || newErrors.questions ||
+      Object.keys(newErrors.questionErrors).length > 0);
+    return { hasErrors, errors: newErrors };
   };
 
   const handleSave = async () => {
-    if (!validateForm()) {
-      const firstErrorQuestionId = Object.keys(errors.questionErrors)[0];
+    const { hasErrors, errors: validationErrors } = validateForm();
+    if (hasErrors) {
+      const firstErrorQuestionId = Object.keys(validationErrors.questionErrors)[0];
       if (firstErrorQuestionId) toggleQuestionExpanded(firstErrorQuestionId);
       return;
     }
@@ -284,7 +309,7 @@ export function PackCreationScreen() {
           const questionData: CreateQuestionData = {
             text: q.text,
             options: q.answers,
-            correctAnswers: q.correctAnswerIndices.length > 0 ? q.correctAnswerIndices : [0],
+            correctAnswers: q.correctAnswerIndices,
             questionType: "SINGLE",
             mediaUrl: q.uploadedImageUrl || undefined,
             mediaType: q.uploadedImageUrl ? "IMAGE" : undefined,
@@ -322,7 +347,7 @@ export function PackCreationScreen() {
         const questions: CreateQuestionData[] = processedQuestions.map((q, index) => ({
           text: q.text,
           options: q.answers,
-          correctAnswers: q.correctAnswerIndices.length > 0 ? q.correctAnswerIndices : [0],
+          correctAnswers: q.correctAnswerIndices,
           questionType: "SINGLE" as const,
           mediaUrl: q.uploadedImageUrl || undefined,
           mediaType: q.uploadedImageUrl ? ("IMAGE" as const) : undefined,
@@ -336,10 +361,12 @@ export function PackCreationScreen() {
         }
       }
 
+      savedSuccessfully.current = true;
       navigation.goBack();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save pack. Please try again.");
-      setApiError(error.message || "Failed to save pack. Please try again.");
+    } catch (error) {
+      const message = getErrorMessage(error);
+      toast.error(message);
+      setApiError(message);
     } finally {
       setIsSaving(false);
     }

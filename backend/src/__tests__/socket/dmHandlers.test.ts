@@ -91,7 +91,7 @@ import {
   registerDmHandlers,
   cleanupUserDmTyping,
   emitDirectMessage,
-} from '../../socket/handlers/dmHandlers';
+} from '@/socket/handlers/dmHandlers';
 
 // ---------------------------------------------------------------------------
 // Socket/IO mock helpers

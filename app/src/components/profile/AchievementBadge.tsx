@@ -3,12 +3,12 @@
  */
 import React from "react";
 import { View } from "react-native";
-import { Text, Icon } from "@/components/ui";
+import { Text, Icon, type IconName } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 
 interface AchievementBadgeProps {
   name: string;
-  icon: string;
+  icon: IconName;
   color: string;
   earned: boolean;
 }
@@ -23,7 +23,7 @@ export function AchievementBadge({ name, icon, color, earned }: AchievementBadge
           opacity: earned ? 1 : 0.5,
         }}
       >
-        <Icon name={icon as any} size="md" color={earned ? color : colors.neutral[400]} />
+        <Icon name={icon} size="md" color={earned ? color : colors.neutral[400]} />
       </View>
       <Text
         variant="caption"

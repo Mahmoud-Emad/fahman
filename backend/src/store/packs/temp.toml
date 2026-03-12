@@ -1,50 +1,78 @@
 [pack-info]
+# Pack name
 name = ""
+
+# Pack description
 description = ""
+
+# Pack version
 version = ""
-author = "Fahman"
-cover = ""
+
+# Pack ID (UUID)
+id = ""
+
+# Pack author
+author = ""
+
+# Pack cover
+cover = "./media/cover.png"
+
+# Pack text hint, this hint will be displayed on bottom of every pack question.
 text-hint = ""
+
+# Pack price (must be > 0 if free = false)
 price = 0
-preview-questions = 0
+
+# Pack preview questions
+preview-questions = 3
+
+# Pack number of questions
 number-of-questions = 10
 
+# Pack category
+category = ""
+
+# Pack is free (if false, price must be > 0)
+free = true
+
+# Pack questions
 [question1]
 question = ""
-answer = ""
+# Pack question can have one or more answers
+answers = [""]
 
 [question2]
 question = ""
-answer = ""
+answers = [""]
 
 [question3]
 question = ""
-answer = ""
+answers = [""]
 
 [question4]
 question = ""
-answer = ""
+answers = [""]
 
 [question5]
 question = ""
-answer = ""
+answers = [""]
 
 [question6]
 question = ""
-answer = ""
+answers = [""]
 
 [question7]
 question = ""
-answer = ""
+answers = [""]
 
 [question8]
 question = ""
-answer = ""
+answers = [""]
 
 [question9]
 question = ""
-answer = ""
+answers = [""]
 
 [question10]
 question = ""
-answer = ""
+answers = [""]

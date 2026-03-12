@@ -5,7 +5,7 @@
 
 import { Request, Response } from 'express';
 import { uploadService } from './uploadService';
-import { successResponse, errorResponse } from '../../shared/utils/responseFormatter';
+import { successResponse, errorResponse } from '@shared/utils/responseFormatter';
 
 export async function uploadPackImage(req: Request, res: Response): Promise<void> {
   const { image, mimeType } = req.body;

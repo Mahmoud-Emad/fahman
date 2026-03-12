@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text, Icon, Avatar, Input, Button } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { useAuth } from "@/hooks";
 import { roomsService } from "@/services/roomsService";
 import type { RootStackParamList } from "../../App";
@@ -148,12 +149,12 @@ export function JoinRoomScreen() {
           room: joinedRoom,
         });
       } else {
-        setError(response.message || "Failed to join room");
         toast.error(response.message || "Failed to join room");
       }
-    } catch (error: any) {
+    } catch (error) {
       // Handle specific error cases
-      if (error.message?.includes("already in this room")) {
+      const message = getErrorMessage(error);
+      if (message.includes("already in this room")) {
         // User is already a member — fetch real room data, then navigate
         toast.info("Rejoining room...");
 
@@ -201,21 +202,17 @@ export function JoinRoomScreen() {
           room: { id: room.id, code: actualCode } as any,
         });
         return;
-      } else if (error.message?.includes("password") || error.message?.includes("incorrect")) {
+      } else if (message.includes("password") || message.includes("incorrect")) {
+        // Form field error — show inline only (visible next to password input)
         setError("Incorrect password. Please try again.");
-        toast.error("Incorrect password. Please try again.");
-      } else if (error.message?.includes("full")) {
-        setError("This room is full");
+      } else if (message.includes("full")) {
         toast.error("This room is full");
-      } else if (error.message?.includes("already started") || error.message?.includes("PLAYING")) {
-        setError("Game has already started");
+      } else if (message.includes("already started") || message.includes("PLAYING")) {
         toast.error("Game has already started");
-      } else if (error.message?.includes("FINISHED") || error.message?.includes("CLOSED")) {
-        setError("This room has ended");
+      } else if (message.includes("FINISHED") || message.includes("CLOSED")) {
         toast.error("This room has ended");
       } else {
-        setError(error.message || "Failed to join room");
-        toast.error(error.message || "Failed to join room. Please try again.");
+        toast.error(message);
       }
     } finally {
       setIsJoining(false);
@@ -416,7 +413,7 @@ export function JoinRoomScreen() {
                   className="h-full rounded-full"
                   style={{
                     backgroundColor: colors.primary[500],
-                    width: `${(room.currentQuestion / room.questionsCount) * 100}%`,
+                    width: `${room.questionsCount > 0 ? (room.currentQuestion / room.questionsCount) * 100 : 0}%`,
                   }}
                 />
               </View>

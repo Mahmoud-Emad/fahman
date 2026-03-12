@@ -8,7 +8,7 @@ import {
   sendMessageSchema,
   sendRoomInviteSchema,
   markAsReadSchema,
-} from '../../modules/social/messageValidator';
+} from '@modules/social/messageValidator';
 
 describe('Message Validators', () => {
   describe('sendMessageSchema', () => {

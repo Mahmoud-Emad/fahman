@@ -1,0 +1,157 @@
+[pack-info]
+# Pack name
+name = "Anime Quotes"
+
+# Pack description
+description = "Test your knowledge of famous anime quotes! Can you guess which anime they come from?"
+
+# Pack version
+version = "1.0.0"
+
+# Pack ID (UUID)
+id = "df34a729-5f44-432d-8bbc-4fb7e72ba81f"
+
+# Pack author
+author = "Fahman"
+
+# Pack cover
+cover = "./media/cover.png"
+
+# Pack text hint
+text-hint = "Guess the anime from the quote"
+
+# Pack price (must be > 0 if free = false)
+price = 50
+
+# Pack preview questions
+preview-questions = 3
+
+# Pack number of questions
+number-of-questions = 30
+
+# Pack category
+category = "TV Shows"
+
+# Pack is free
+free = false
+
+# Pack questions
+[question1]
+question = "I’m going to be King of the Pirates!"
+answers = ["One Piece"]
+
+[question2]
+question = "I’ll take a potato chip… AND EAT IT!"
+answers = ["Death Note"]
+
+[question3]
+question = "People die when they are killed."
+answers = ["Attack on Titan"]
+
+[question4]
+question = "I am gonna become the Hokage!"
+answers = ["Naruto"]
+
+[question5]
+question = "Just according to keikaku."
+answers = ["Death Note"]
+
+[question6]
+question = "I’ll surpass even God!"
+answers = ["Dragon Ball Z"]
+
+[question7]
+question = "Believe it!"
+answers = ["Naruto"]
+
+[question8]
+question = "I’ll leave tomorrow for the arena."
+answers = ["Sword Art Online"]
+
+[question9]
+question = "I am Justice!"
+answers = ["Death Note"]
+
+[question10]
+question = "I’m gonna crush you!"
+answers = ["Attack on Titan"]
+
+[question11]
+question = "I am the hope of the universe!"
+answers = ["Dragon Ball Z"]
+
+[question12]
+question = "I am the one who will defeat the Titans!"
+answers = ["Attack on Titan"]
+
+[question13]
+question = "I’ll take all responsibility."
+answers = ["Fullmetal Alchemist"]
+
+[question14]
+question = "I’ll become the Pirate King!"
+answers = ["One Piece"]
+
+[question15]
+question = "I’ll surpass my limits!"
+answers = ["Dragon Ball Z"]
+
+[question16]
+question = "I’m going to save everyone!"
+answers = ["My Hero Academia"]
+
+[question17]
+question = "This world is rotten."
+answers = ["Death Note"]
+
+[question18]
+question = "I’ll protect my friends no matter what!"
+answers = ["Naruto"]
+
+[question19]
+question = "I’m the strongest in the world!"
+answers = ["Dragon Ball Z"]
+
+[question20]
+question = "I will never go back on my word!"
+answers = ["One Piece"]
+
+[question21]
+question = "I will become a hero for everyone!"
+answers = ["My Hero Academia"]
+
+[question22]
+question = "I’m the one who will bring peace!"
+answers = ["Fullmetal Alchemist"]
+
+[question23]
+question = "I’ll take on the world!"
+answers = ["Naruto"]
+
+[question24]
+question = "I will not run away!"
+answers = ["Attack on Titan"]
+
+[question25]
+question = "I’m the future King of the World!"
+answers = ["Dragon Ball Z"]
+
+[question26]
+question = "I will be the greatest hero!"
+answers = ["My Hero Academia"]
+
+[question27]
+question = "I am the last hope!"
+answers = ["Death Note"]
+
+[question28]
+question = "I will never give up!"
+answers = ["Naruto"]
+
+[question29]
+question = "I will surpass all limits!"
+answers = ["Dragon Ball Z"]
+
+[question30]
+question = "I will sail to the ends of the world!"
+answers = ["One Piece"]

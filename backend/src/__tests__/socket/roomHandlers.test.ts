@@ -67,7 +67,7 @@ import {
   broadcastRoomUpdate,
   broadcastRoomClosed,
   notifyPlayerKicked,
-} from '../../socket/handlers/roomHandlers';
+} from '@/socket/handlers/roomHandlers';
 
 // ---------------------------------------------------------------------------
 // Socket/IO mock helpers

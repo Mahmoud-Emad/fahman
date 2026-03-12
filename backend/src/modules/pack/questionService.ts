@@ -3,9 +3,9 @@
  * Business logic for question management
  */
 
-import { prisma } from '../../config/database';
+import { prisma } from '@config/database';
 import { QuestionType, MediaType, Prisma } from '@prisma/client';
-import { ValidationError, NotFoundError, ForbiddenError } from '../../shared/utils/errors';
+import { ValidationError, NotFoundError, ForbiddenError } from '@shared/utils/errors';
 
 interface CreateQuestionData {
   text: string;

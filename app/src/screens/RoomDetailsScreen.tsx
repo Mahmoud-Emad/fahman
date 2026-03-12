@@ -27,8 +27,8 @@ import {
   ChatDetailsModal,
 } from "@/components/messaging";
 import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
-import { useMessaging, useFriends, useRoomPresence } from "@/hooks";
-import { useToast } from "@/contexts";
+import { useMessaging, useRoomPresence } from "@/hooks";
+import { useToast, useFriendsContext } from "@/contexts";
 import { roomsService } from "@/services/roomsService";
 import type { RoomMemberInfo } from "@/services/socketService";
 import type { RootStackParamList } from "../../App";
@@ -49,9 +49,12 @@ export function RoomDetailsScreen() {
   const toast = useToast();
   const { roomId, isHost: routeIsHost } = route.params;
 
+  // Guard against double navigation on leave/close/kick
+  const hasLeftRoom = useRef(false);
+
   // Use centralized hooks
   const messaging = useMessaging();
-  const friendsHook = useFriends();
+  const friendsHook = useFriendsContext();
 
   // Game state management
   const gameState = useGameState({
@@ -98,10 +101,14 @@ export function RoomDetailsScreen() {
       gameState.setTotalPlayers((prev) => Math.max(0, prev - 1));
     },
     onRoomClosed: (reason: string) => {
+      if (hasLeftRoom.current) return;
+      hasLeftRoom.current = true;
       toast.error(`Room closed: ${reason}`);
       navigation.reset({ index: 0, routes: [{ name: "Home" }] });
     },
     onKicked: (reason: string) => {
+      if (hasLeftRoom.current) return;
+      hasLeftRoom.current = true;
       toast.error(`You were kicked: ${reason}`);
       navigation.reset({ index: 0, routes: [{ name: "Home" }] });
     },
@@ -205,6 +212,7 @@ export function RoomDetailsScreen() {
     setUsedBets: gameState.setUsedBets,
     setPlayers: gameState.setPlayers,
     setMessages: gameState.setMessages,
+    hasLeftRoom,
     onOpenNotifications: messaging.openNotifications,
     onOpenChatsList: messaging.openChatsList,
     onOpenFriendsList: friendsHook.openFriendsList,

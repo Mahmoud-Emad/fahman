@@ -1,8 +1,10 @@
 /**
  * AuthContext - Authentication state management
+ * Handles auth initialization, socket-based connectivity monitoring, and session management
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, ReactNode } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import {
   authService,
   User,
@@ -18,57 +20,51 @@ import {
   UpdatePhoneData,
   VerifyUserPhoneData,
 } from '@/services/authService';
-import { api } from '@/services/api';
+import { api, setOnUnauthorized } from '@/services/api';
 import { storage } from '@/services/storage';
 import { socketService } from '@/services/socketService';
+import { userService } from '@/services/userService';
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface AuthState {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   connectionError: string | null;
-  isInitializing: boolean; // True only during initial auth check on app start
-  isNewUser: boolean; // True when user just registered and needs to select avatar
+  isInitializing: boolean;
+  isNewUser: boolean;
 }
 
 interface AuthContextType extends AuthState {
-  // Login methods
   loginWithEmail: (data: LoginData) => Promise<void>;
   loginWithGameId: (data: LoginWithGameIdData) => Promise<void>;
   loginWithPhone: (data: LoginWithPhoneData) => Promise<void>;
   loginWithGoogle: (data: OAuthData) => Promise<void>;
   loginWithFacebook: (data: OAuthData) => Promise<void>;
-
-  // Registration
   registerWithEmail: (data: RegisterData) => Promise<void>;
-
-  // Phone verification
   sendPhoneVerification: (phoneNumber: string) => Promise<{ code?: string }>;
   verifyPhone: (phoneNumber: string, code: string) => Promise<void>;
-
-  // Password reset
   forgotPassword: (data: ForgotPasswordData) => Promise<{ code?: string }>;
   resetPassword: (data: ResetPasswordData) => Promise<void>;
-
-  // Profile management
   updateProfile: (data: UpdateProfileData) => Promise<void>;
   updatePhoneNumber: (data: UpdatePhoneData) => Promise<{ code?: string }>;
   verifyUserPhone: (data: VerifyUserPhoneData) => Promise<void>;
   removePhoneNumber: () => Promise<void>;
-
-  // Session management
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-
-  // Connection
-  checkConnection: () => Promise<boolean>;
-  clearConnectionError: () => void;
-
-  // New user avatar selection
+  /** Re-run full auth initialization (health check + token validation) */
+  reinitialize: () => Promise<void>;
   clearNewUserFlag: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// ============================================================================
+// PROVIDER
+// ============================================================================
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -76,25 +72,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: false,
     isAuthenticated: false,
     connectionError: null,
-    isInitializing: true, // Only true during initial auth check
+    isInitializing: true,
     isNewUser: false,
   });
 
-  // Initialize auth state on app start
-  useEffect(() => {
-    initializeAuth();
-  }, []);
+  const wasDisconnected = useRef(false);
+
+  // --------------------------------------------------------------------------
+  // AUTH INITIALIZATION
+  // --------------------------------------------------------------------------
 
   const initializeAuth = async () => {
     try {
-      // First check if backend is reachable
-      const { connected, error: connectionError } = await api.checkHealth();
+      const { connected } = await api.checkHealth();
       if (!connected) {
         setState({
           user: null,
           isLoading: false,
           isAuthenticated: false,
-          connectionError: connectionError || 'Unable to connect to server',
+          connectionError: 'Unable to connect to server',
           isInitializing: false,
           isNewUser: false,
         });
@@ -103,7 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const token = await storage.getAccessToken();
       if (token) {
-        // Try to get fresh user data
+        // The api interceptor handles 401 → refresh automatically.
+        // If the access token is expired, the interceptor refreshes it
+        // before returning. If refresh also fails, onUnauthorized fires.
         try {
           const response = await authService.getCurrentUser();
           if (response.data) {
@@ -115,40 +113,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               isInitializing: false,
               isNewUser: false,
             });
-
-            // Connect to WebSocket after restoring session
             socketService.connect().catch(() => {});
-
+            userService.updateStreak().catch(() => {});
             return;
           }
-        } catch (error) {
-          // Token might be expired, try to refresh
-          try {
-            await authService.refreshToken();
-            const response = await authService.getCurrentUser();
-            if (response.data) {
-              setState({
-                user: response.data,
-                isLoading: false,
-                isAuthenticated: true,
-                connectionError: null,
-                isInitializing: false,
-                isNewUser: false,
-              });
-
-              // Connect to WebSocket after restoring session via refresh
-              socketService.connect().catch(() => {});
-
-              return;
-            }
-          } catch (refreshError) {
-            // Refresh failed, clear tokens
-            await storage.clearAll();
-          }
+        } catch {
+          // getCurrentUser failed even after refresh attempt — not authenticated
         }
       }
     } catch {
-      // Initialization failure — app will show login screen via unauthenticated state
+      setState({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        connectionError: 'Unable to connect to server',
+        isInitializing: false,
+        isNewUser: false,
+      });
+      return;
     }
 
     setState({
@@ -161,22 +143,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const handleAuthResponse = useCallback((response: { data?: AuthResponse }) => {
-    if (response.data) {
+  // Run on mount
+  useEffect(() => {
+    // Register the unauthorized callback so the api interceptor can trigger logout
+    setOnUnauthorized(() => {
+      socketService.disconnect();
       setState(prev => ({
         ...prev,
-        user: response.data!.user,
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        isNewUser: false,
+      }));
+    });
+
+    initializeAuth();
+
+    return () => { setOnUnauthorized(null); };
+  }, []);
+
+  // --------------------------------------------------------------------------
+  // SOCKET-BASED CONNECTIVITY MONITORING
+  // --------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (state.isInitializing) return;
+
+    // Listen for socket connect/disconnect instead of polling HTTP health
+    const unsubConnect = socketService.onConnect(() => {
+      if (wasDisconnected.current) {
+        wasDisconnected.current = false;
+        setState(prev => ({ ...prev, isInitializing: true, connectionError: null }));
+        initializeAuth();
+      } else {
+        setState(prev => {
+          if (!prev.connectionError) return prev;
+          return { ...prev, connectionError: null };
+        });
+      }
+    });
+
+    const unsubDisconnect = socketService.onDisconnect(() => {
+      wasDisconnected.current = true;
+      setState(prev => {
+        if (prev.connectionError) return prev;
+        return { ...prev, connectionError: 'Unable to connect to server' };
+      });
+    });
+
+    // When app returns to foreground, socket.io reconnects automatically.
+    // We just ensure the socket is connected.
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active' && !socketService.isConnected) {
+        socketService.connect().catch(() => {});
+      }
+    });
+
+    return () => {
+      unsubConnect();
+      unsubDisconnect();
+      subscription.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initializeAuth is stable (no deps), re-subscribing on every render is wasteful
+  }, [state.isInitializing]);
+
+  // --------------------------------------------------------------------------
+  // AUTH HELPERS
+  // --------------------------------------------------------------------------
+
+  const handleAuthResponse = useCallback((response: { data?: AuthResponse }) => {
+    if (response.data) {
+      const { user, isNewUser } = response.data;
+      setState(prev => ({
+        ...prev,
+        user,
         isLoading: false,
         isAuthenticated: true,
-        isNewUser: response.data!.isNewUser ?? false,
+        isNewUser: isNewUser ?? false,
       }));
-
-      // Connect to WebSocket after successful authentication
-      socketService.connect().catch(() => {
-        // WebSocket connection failure is non-critical; real-time features will be unavailable
-      });
+      socketService.connect().catch(() => {});
     }
   }, []);
+
+  // --------------------------------------------------------------------------
+  // LOGIN METHODS
+  // --------------------------------------------------------------------------
 
   const loginWithEmail = useCallback(async (data: LoginData) => {
     setState(prev => ({ ...prev, isLoading: true }));
@@ -244,6 +295,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [handleAuthResponse]);
 
+  // --------------------------------------------------------------------------
+  // PHONE VERIFICATION
+  // --------------------------------------------------------------------------
+
   const sendPhoneVerification = useCallback(async (phoneNumber: string) => {
     const response = await authService.sendPhoneVerification(phoneNumber);
     return { code: response.data?.code };
@@ -260,13 +315,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [handleAuthResponse]);
 
+  // --------------------------------------------------------------------------
+  // SESSION MANAGEMENT
+  // --------------------------------------------------------------------------
+
   const logout = useCallback(async () => {
     setState(prev => ({ ...prev, isLoading: true }));
-    await authService.logout();
-
-    // Disconnect from WebSocket
+    // Retrieve refresh token before clearing storage so the server can revoke it
+    const refreshToken = await storage.getRefreshToken();
+    try {
+      await api.post('/auth/logout', { refreshToken });
+    } catch {
+      // Ignore logout API errors — clear local state regardless
+    }
+    await storage.clearAll();
     socketService.disconnect();
-
     setState(prev => ({
       ...prev,
       user: null,
@@ -280,38 +343,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.getCurrentUser();
       if (response.data) {
-        setState(prev => ({
-          ...prev,
-          user: response.data!,
-        }));
+        const user = response.data;
+        setState(prev => ({ ...prev, user }));
       }
     } catch {
-      // Refresh failure is non-critical; stale user data will remain in state
+      // Non-critical — stale user data remains
     }
   }, []);
 
-  const checkConnection = useCallback(async () => {
-    const { connected, error: connectionError } = await api.checkHealth();
-    setState(prev => ({
-      ...prev,
-      connectionError: connected ? null : (connectionError || 'Unable to connect to server'),
-    }));
-    return connected;
+  const reinitialize = useCallback(async () => {
+    setState(prev => ({ ...prev, isInitializing: true, connectionError: null }));
+    await initializeAuth();
   }, []);
 
-  const clearConnectionError = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      connectionError: null,
-    }));
-  }, []);
-
-  const clearNewUserFlag = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      isNewUser: false,
-    }));
-  }, []);
+  // --------------------------------------------------------------------------
+  // PASSWORD RESET
+  // --------------------------------------------------------------------------
 
   const forgotPassword = useCallback(async (data: ForgotPasswordData) => {
     const response = await authService.forgotPassword(data);
@@ -322,23 +369,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authService.resetPassword(data);
   }, []);
 
+  // --------------------------------------------------------------------------
+  // PROFILE MANAGEMENT
+  // --------------------------------------------------------------------------
+
   const updateProfile = useCallback(async (data: UpdateProfileData) => {
     const response = await authService.updateProfile(data);
     if (response.data) {
-      setState(prev => ({
-        ...prev,
-        user: response.data!,
-      }));
+      const user = response.data;
+      setState(prev => ({ ...prev, user }));
     }
   }, []);
 
   const updatePhoneNumber = useCallback(async (data: UpdatePhoneData) => {
     const response = await authService.updatePhoneNumber(data);
     if (response.data?.user) {
-      setState(prev => ({
-        ...prev,
-        user: response.data!.user,
-      }));
+      const { user } = response.data;
+      setState(prev => ({ ...prev, user }));
     }
     return { code: response.data?.code };
   }, []);
@@ -346,22 +393,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const verifyUserPhone = useCallback(async (data: VerifyUserPhoneData) => {
     const response = await authService.verifyUserPhone(data);
     if (response.data) {
-      setState(prev => ({
-        ...prev,
-        user: response.data!,
-      }));
+      const user = response.data;
+      setState(prev => ({ ...prev, user }));
     }
   }, []);
 
   const removePhoneNumber = useCallback(async () => {
     const response = await authService.removePhoneNumber();
     if (response.data) {
-      setState(prev => ({
-        ...prev,
-        user: response.data!,
-      }));
+      const user = response.data;
+      setState(prev => ({ ...prev, user }));
     }
   }, []);
+
+  const clearNewUserFlag = useCallback(() => {
+    setState(prev => ({ ...prev, isNewUser: false }));
+  }, []);
+
+  // --------------------------------------------------------------------------
+  // CONTEXT VALUE
+  // --------------------------------------------------------------------------
 
   const contextValue = useMemo(
     () => ({
@@ -382,8 +433,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removePhoneNumber,
       logout,
       refreshUser,
-      checkConnection,
-      clearConnectionError,
+      reinitialize,
       clearNewUserFlag,
     }),
     [
@@ -404,8 +454,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removePhoneNumber,
       logout,
       refreshUser,
-      checkConnection,
-      clearConnectionError,
+      reinitialize,
       clearNewUserFlag,
     ]
   );

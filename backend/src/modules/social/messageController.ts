@@ -4,10 +4,11 @@
  */
 
 import { Response, NextFunction } from 'express';
-import { AuthRequest } from '../../shared/types/index';
+import { AuthRequest } from '@shared/types/index';
+import { getAuthUser } from '@shared/middleware/getAuthUser';
 import messageService from './messageService';
-import { successResponse } from '../../shared/utils/responseFormatter';
-import { emitDmMessage } from '../../socket';
+import { successResponse } from '@shared/utils/responseFormatter';
+import { getSocketRegistry } from '@/socket';
 
 /**
  * Get all conversations (DMs)
@@ -18,7 +19,7 @@ export async function getConversations(
   next: NextFunction
 ): Promise<void> {
   try {
-    const conversations = await messageService.getConversations(req.user!.id);
+    const conversations = await messageService.getConversations(getAuthUser(req).id);
     res.json(successResponse(conversations, 'Conversations retrieved'));
   } catch (error) {
     next(error);
@@ -38,7 +39,7 @@ export async function getConversationMessages(
     const { limit, before } = req.query;
 
     const result = await messageService.getConversationMessages(
-      req.user!.id,
+      getAuthUser(req).id,
       userId,
       {
         limit: limit ? parseInt(limit as string) : undefined,
@@ -64,18 +65,18 @@ export async function sendMessage(
     const { recipientId, text } = req.body;
 
     const message = await messageService.sendDirectMessage(
-      req.user!.id,
+      getAuthUser(req).id,
       recipientId,
       text
     );
 
     // Emit WebSocket event for real-time delivery
-    emitDmMessage(recipientId, {
+    getSocketRegistry()?.emitDmMessage(recipientId, {
       id: message.id,
       senderId: message.senderId,
       senderName: message.sender.displayName || message.sender.username,
       senderAvatar: message.sender.avatar,
-      recipientId: message.recipientId,
+      recipientId,
       text: message.text,
       timestamp: message.createdAt,
       type: 'PRIVATE',
@@ -99,7 +100,7 @@ export async function sendRoomInvite(
     const { recipientIds, roomCode, roomTitle } = req.body;
 
     const messages = await messageService.sendRoomInvite(
-      req.user!.id,
+      getAuthUser(req).id,
       recipientIds,
       roomCode,
       roomTitle
@@ -108,7 +109,7 @@ export async function sendRoomInvite(
     // Emit WebSocket events for real-time delivery
     for (const message of messages) {
       if (!message.recipientId) continue;
-      emitDmMessage(message.recipientId, {
+      getSocketRegistry()?.emitDmMessage(message.recipientId, {
         id: message.id,
         senderId: message.senderId,
         senderName: message.sender.displayName || message.sender.username,
@@ -140,7 +141,7 @@ export async function getRoomMessages(
     const { roomId } = req.params;
     const { limit, before } = req.query;
 
-    const result = await messageService.getRoomMessages(req.user!.id, roomId, {
+    const result = await messageService.getRoomMessages(getAuthUser(req).id, roomId, {
       limit: limit ? parseInt(limit as string) : undefined,
       before: before as string,
     });
@@ -162,7 +163,7 @@ export async function markAsRead(
   try {
     const { messageIds } = req.body;
 
-    const count = await messageService.markAsRead(req.user!.id, messageIds);
+    const count = await messageService.markAsRead(getAuthUser(req).id, messageIds);
 
     res.json(successResponse({ markedRead: count }, 'Messages marked as read'));
   } catch (error) {
@@ -181,7 +182,7 @@ export async function markConversationAsRead(
   try {
     const { userId } = req.params;
 
-    const count = await messageService.markConversationAsRead(req.user!.id, userId);
+    const count = await messageService.markConversationAsRead(getAuthUser(req).id, userId);
 
     res.json(successResponse({ markedRead: count }, 'Conversation marked as read'));
   } catch (error) {
@@ -198,7 +199,7 @@ export async function getUnreadCount(
   next: NextFunction
 ): Promise<void> {
   try {
-    const count = await messageService.getUnreadCount(req.user!.id);
+    const count = await messageService.getUnreadCount(getAuthUser(req).id);
     res.json(successResponse({ unreadCount: count }));
   } catch (error) {
     next(error);
@@ -216,7 +217,7 @@ export async function deleteMessage(
   try {
     const { id } = req.params;
 
-    await messageService.deleteMessage(req.user!.id, id);
+    await messageService.deleteMessage(getAuthUser(req).id, id);
 
     res.json(successResponse(null, 'Message deleted'));
   } catch (error) {

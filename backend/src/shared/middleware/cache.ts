@@ -4,7 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { getRedis } from '../../config/redis';
+import { getRedis } from '@config/redis';
 import logger from '../utils/logger';
 
 const CACHE_PREFIX = 'cache:';

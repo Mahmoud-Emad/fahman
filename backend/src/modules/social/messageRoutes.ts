@@ -4,15 +4,15 @@
  */
 
 import { Router } from 'express';
-import { authenticate } from '../../shared/middleware/auth';
-import { validate, validateUUID, validateQuery } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { validate, validateUUID, validateQuery } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import {
   sendMessageSchema,
   sendRoomInviteSchema,
   markAsReadSchema,
 } from './messageValidator';
-import { cursorPaginationSchema } from '../../shared/middleware/paginationValidator';
+import { cursorPaginationSchema } from '@shared/middleware/paginationValidator';
 import * as messageController from './messageController';
 
 const router = Router();

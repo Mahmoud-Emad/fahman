@@ -3,11 +3,11 @@
  */
 import React from "react";
 import { View } from "react-native";
-import { Text, Icon } from "@/components/ui";
+import { Text, Icon, type IconName } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 
 interface FloatingBadgeProps {
-  icon: string;
+  icon: IconName;
   label: string;
   position: { top?: number; bottom?: number; left?: number; right?: number };
 }
@@ -23,7 +23,7 @@ export function FloatingBadge({ icon, label, position }: FloatingBadgeProps) {
         borderColor: withOpacity(colors.white, 0.3),
       }}
     >
-      <Icon name={icon as any} customSize={14} color={colors.white} />
+      <Icon name={icon} customSize={14} color={colors.white} />
       <Text
         variant="caption"
         className="ml-1.5 font-semibold"

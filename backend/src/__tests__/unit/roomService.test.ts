@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { NotFoundError, ForbiddenError, ValidationError } from '../../shared/utils/errors';
+import { NotFoundError, ForbiddenError, ValidationError } from '@shared/utils/errors';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -123,13 +123,6 @@ mock.module('../../config/database', () => ({
   },
 }));
 
-// Mock socket emitRoomUpdated
-const mockEmitRoomUpdated = mock(() => {});
-
-mock.module('../../socket', () => ({
-  emitRoomUpdated: mockEmitRoomUpdated,
-}));
-
 // Mock hashPassword
 const mockHashPassword = mock(() => Promise.resolve('hashed-password-123'));
 
@@ -138,7 +131,7 @@ mock.module('../../shared/utils/passwordUtils', () => ({
 }));
 
 // Import after mocking so the module picks up the mocked dependencies
-import { RoomService } from '../../modules/room/roomService';
+import { RoomService } from '@modules/room/roomService';
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -158,7 +151,6 @@ describe('RoomService', () => {
     mockRoomMemberFindMany.mockReset();
     mockPackFindUnique.mockReset();
     mockTransaction.mockReset();
-    mockEmitRoomUpdated.mockReset();
     mockHashPassword.mockReset();
 
     // Set default resolved values
@@ -423,12 +415,6 @@ describe('RoomService', () => {
 
       expect(result.title).toBe('Updated Title');
       expect(mockRoomUpdate).toHaveBeenCalledTimes(1);
-    });
-
-    it('should emit room updated socket event after successful update', async () => {
-      await service.updateRoom('user-1', 'room-1', { title: 'Updated Title' });
-
-      expect(mockEmitRoomUpdated).toHaveBeenCalledWith('room-1', { title: 'Updated Title' });
     });
 
     it('should allow updating maxPlayers when it is greater than or equal to current players', async () => {

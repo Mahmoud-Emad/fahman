@@ -5,9 +5,9 @@
 import express from 'express';
 import * as friendController from '../social/friendController';
 import * as userController from './userController';
-import { authenticate } from '../../shared/middleware/auth';
-import { validateQuery, validateUUID } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { validateQuery, validateUUID } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import { searchUsersSchema, recentGamesSchema } from './userValidator';
 
 const router = express.Router();
@@ -129,6 +129,24 @@ router.get('/me/games/recent', authenticate, validateQuery(recentGamesSchema), a
  *         description: Unauthorized
  */
 router.get('/me/achievements', authenticate, asyncHandler(userController.getUserAchievements));
+
+/**
+ * @openapi
+ * /api/users/me/streak:
+ *   post:
+ *     tags:
+ *       - Users
+ *     summary: Update daily streak
+ *     description: Called on app open to update the user's daily login streak
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Updated streak data
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/me/streak', authenticate, asyncHandler(userController.updateStreak));
 
 /**
  * @openapi

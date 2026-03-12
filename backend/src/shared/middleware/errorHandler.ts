@@ -8,7 +8,7 @@ import { Prisma } from '@prisma/client';
 import logger from '../utils/logger';
 import { errorResponse } from '../utils/responseFormatter';
 import { AppError } from '../utils/errors';
-import { config } from '../../config/env';
+import { config } from '@config/env';
 
 /**
  * Global error handling middleware

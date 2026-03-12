@@ -3,13 +3,15 @@
  * Business logic for game lifecycle: state, answer submission, and question progression
  */
 
-import { prisma } from '../../config/database';
-import { ValidationError, NotFoundError, ForbiddenError } from '../../shared/utils/errors';
+import { prisma } from '@config/database';
+import { getRedis } from '@config/redis';
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '@shared/utils/errors';
+import logger from '@shared/utils/logger';
+import { getErrorMessage } from '@shared/utils/errorUtils';
 
 interface SubmitAnswerParams {
   answer: number | number[]; // Answer index(es)
   betAmount: number;
-  timeRemaining: number; // Seconds remaining when answered
 }
 
 interface GameState {
@@ -135,7 +137,13 @@ export class GameService {
     userId: string,
     params: SubmitAnswerParams
   ) {
-    const { answer, betAmount, timeRemaining } = params;
+    const { answer, betAmount } = params;
+
+    // Validate bet amount upfront (confidence points 0-10)
+    const MAX_BET = 10;
+    if (!Number.isInteger(betAmount) || betAmount < 0 || betAmount > MAX_BET) {
+      throw new ValidationError(`Bet must be an integer between 0 and ${MAX_BET}`);
+    }
 
     // Get room with current question
     const room = await prisma.room.findUnique({
@@ -150,9 +158,6 @@ export class GameService {
         },
         members: {
           where: { userId, isActive: true },
-          include: {
-            answers: true,
-          },
         },
       },
     });
@@ -177,37 +182,44 @@ export class GameService {
       throw new ValidationError('No current question');
     }
 
-    // Check if already answered this question
-    const existingAnswer = member.answers.find(
-      (a) => a.questionId === currentQuestion.id
-    );
-    if (existingAnswer) {
-      throw new ValidationError('You have already answered this question');
-    }
-
-    // Validate bet amount (positive integer)
-    if (betAmount < 0 || !Number.isInteger(betAmount)) {
-      throw new ValidationError('Invalid bet amount');
-    }
-
     // Calculate if answer is correct
     const correctAnswers = currentQuestion.correctAnswers as number[];
     const isCorrect = this.checkAnswer(answer, correctAnswers, currentQuestion.questionType);
 
-    // Calculate points earned
+    // Server-side time calculation from Redis start timestamp
     const timeLimit = currentQuestion.timeLimit;
-    const timeTaken = Math.max(0, timeLimit - timeRemaining);
+    let timeTaken = timeLimit; // Default to full time if Redis unavailable
+    try {
+      const redis = getRedis();
+      const startTimeStr = await redis.get(`question:start:${roomId}:${room.currentQuestionIndex}`);
+      if (startTimeStr) {
+        timeTaken = (Date.now() - parseInt(startTimeStr, 10)) / 1000;
+        timeTaken = Math.max(0, Math.min(timeTaken, timeLimit));
+      }
+    } catch (error) {
+      logger.warn(`Failed to get question start time from Redis: ${getErrorMessage(error)}`);
+    }
     const pointsEarned = this.calculatePoints(
       isCorrect,
       betAmount,
       currentQuestion.points,
       timeTaken,
-      timeLimit
+      timeLimit,
+      member.score,
     );
 
-    // Create player answer and update score in transaction
-    const [_playerAnswer] = await prisma.$transaction([
-      prisma.playerAnswer.create({
+    // Interactive transaction: re-check for existing answer + create + update score
+    const result = await prisma.$transaction(async (tx) => {
+      // Check inside tx — the @@unique constraint is the ultimate safety net,
+      // but this gives a friendly error message instead of a raw Prisma P2002
+      const existing = await tx.playerAnswer.findUnique({
+        where: { roomMemberId_questionId: { roomMemberId: member.id, questionId: currentQuestion.id } },
+      });
+      if (existing) {
+        throw new ConflictError('You have already answered this question');
+      }
+
+      await tx.playerAnswer.create({
         data: {
           roomMemberId: member.id,
           questionId: currentQuestion.id,
@@ -217,20 +229,24 @@ export class GameService {
           pointsEarned,
           timeToAnswer: timeTaken * 1000, // Convert to milliseconds
         },
-      }),
-      prisma.roomMember.update({
+      });
+
+      const updatedMember = await tx.roomMember.update({
         where: { id: member.id },
         data: {
           score: { increment: pointsEarned },
         },
-      }),
-    ]);
+        select: { score: true },
+      });
+
+      return updatedMember.score;
+    });
 
     return {
       isCorrect,
       pointsEarned,
       correctAnswer: correctAnswers,
-      newScore: member.score + pointsEarned,
+      newScore: result,
     };
   }
 
@@ -255,18 +271,21 @@ export class GameService {
   }
 
   /**
-   * Calculate points based on correctness, bet, base points, and speed
+   * Calculate points based on correctness, bet, base points, and speed.
+   * Wrong answers lose up to betAmount but never push score below 0.
    */
   private calculatePoints(
     isCorrect: boolean,
     betAmount: number,
     basePoints: number,
     timeTaken: number,
-    timeLimit: number
+    timeLimit: number,
+    currentScore: number,
   ): number {
     if (!isCorrect) {
-      // Wrong answer: lose bet amount
-      return -betAmount;
+      // Wrong answer: lose bet amount, capped so score doesn't go below 0
+      const maxLoss = Math.max(0, currentScore);
+      return -Math.min(betAmount, maxLoss);
     }
 
     // Correct answer: base points + bet bonus + speed bonus

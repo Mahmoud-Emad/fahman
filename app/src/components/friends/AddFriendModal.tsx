@@ -8,6 +8,7 @@ import type { StackNavigationProp } from "@react-navigation/stack";
 import { Modal, Text, Icon, SearchInput, Pressable } from "@/components/ui";
 import { colors, withOpacity } from "@/themes";
 import { friendsService, type UserSearchResult } from "@/services/friendsService";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { FriendSearchResults } from "./FriendSearchResults";
 import type { RootStackParamList } from "../../../App";
 
@@ -77,8 +78,8 @@ export function AddFriendModal({
         setSearchResults([]);
       }
       setHasSearched(true);
-    } catch (err: any) {
-      setError(err.message || "Search failed");
+    } catch (err) {
+      setError(getErrorMessage(err));
       setSearchResults([]);
       setHasSearched(true);
     } finally {
@@ -122,8 +123,8 @@ export function AddFriendModal({
           setSuccessMessage(`Friend request sent to ${user.displayName || user.username}!`);
           onFriendAdded?.();
         }
-      } catch (err: any) {
-        setError(err.message || "Failed to send request");
+      } catch (err) {
+        setError(getErrorMessage(err));
       } finally {
         setSendingTo(null);
       }
@@ -152,8 +153,8 @@ export function AddFriendModal({
           setSuccessMessage("Friend request cancelled");
           onFriendAdded?.();
         }
-      } catch (err: any) {
-        setError(err.message || "Failed to cancel request");
+      } catch (err) {
+        setError(getErrorMessage(err));
       } finally {
         setSendingTo(null);
       }
@@ -178,11 +179,12 @@ export function AddFriendModal({
         setHasSearched(false);
         onFriendAdded?.();
       }
-    } catch (err: any) {
-      if (err.message?.includes("not found")) {
+    } catch (err) {
+      const message = getErrorMessage(err);
+      if (message.includes("not found")) {
         performSearch(searchQuery);
       } else {
-        setError(err.message || "Failed to send request");
+        setError(message);
       }
     } finally {
       setIsSearching(false);

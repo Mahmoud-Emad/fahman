@@ -14,6 +14,7 @@ export interface UserStats {
   wins: number;
   winRate: number;
   totalPoints: number;
+  friendsCount: number;
   currentStreak: number;
   bestStreak: number;
   topScores?: Array<{
@@ -86,6 +87,13 @@ class UserService {
    */
   async getUserAchievements(): Promise<ApiResponse<Achievement[]>> {
     return api.get<Achievement[]>('/users/me/achievements');
+  }
+
+  /**
+   * Update daily login streak (called on app open)
+   */
+  async updateStreak(): Promise<ApiResponse<{ currentStreak: number; bestStreak: number }>> {
+    return api.post<{ currentStreak: number; bestStreak: number }>('/users/me/streak');
   }
 
   /**

@@ -11,7 +11,7 @@ import {
   loginWithGameIdSchema,
   verifyPhoneSchema,
   updateProfileSchema,
-} from '../../modules/auth/authValidator';
+} from '@modules/auth/authValidator';
 
 describe('Auth Validators', () => {
   describe('registerSchema', () => {

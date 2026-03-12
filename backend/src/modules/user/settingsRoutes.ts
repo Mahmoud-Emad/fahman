@@ -5,9 +5,9 @@
 
 import express from 'express';
 import * as settingsController from './settingsController';
-import { authenticate } from '../../shared/middleware/auth';
-import { validate } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { validate } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import { updateSettingsSchema } from './settingsValidator';
 
 const router = express.Router();

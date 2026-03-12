@@ -3,7 +3,7 @@
  * Shows after a game ends with celebratory UI
  */
 import React, { useEffect, useRef, useState } from "react";
-import { View, ScrollView, Animated, Pressable } from "react-native";
+import { View, ScrollView, Animated, Pressable, BackHandler } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
@@ -11,6 +11,7 @@ import { Text, Icon, Button } from "@/components/ui";
 import { colors } from "@/themes";
 import { roomsService } from "@/services/roomsService";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { Confetti, WinnerCard } from "@/components/game/ResultsStatsCard";
 import { Podium, LeaderboardRow } from "@/components/game/ResultsLeaderboard";
 import type { RootStackParamList } from "../../App";
@@ -73,6 +74,15 @@ export function GameResultsScreen() {
     });
   }, [roomId]);
 
+  // Intercept hardware back button — go to Home instead of stale game screen
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleExit();
+      return true;
+    });
+    return () => backHandler.remove();
+  }, []);
+
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -98,18 +108,27 @@ export function GameResultsScreen() {
           toast.error("This room has ended. Create a new one!");
           navigation.reset({ index: 0, routes: [{ name: "Home" }] });
         } else {
-          navigation.navigate("RoomLobby", {
-            pack: route.params.pack,
-            config: route.params.config,
-            isHost: route.params.isHost,
-            room: route.params.room,
+          navigation.reset({
+            index: 1,
+            routes: [
+              { name: "Home" },
+              {
+                name: "RoomLobby",
+                params: {
+                  pack: route.params.pack,
+                  config: route.params.config,
+                  isHost: route.params.isHost,
+                  room: route.params.room,
+                },
+              },
+            ],
           });
         }
       } else {
         toast.error("Failed to check room status");
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to restart game");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsValidating(false);
     }

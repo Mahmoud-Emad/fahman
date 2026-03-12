@@ -12,6 +12,7 @@ import { usePacks } from "@/hooks";
 import { roomsService } from "@/services/roomsService";
 import { messageService } from "@/services/messageService";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import type { PackData } from "@/components/packs/types";
 import type { Friend } from "./types";
 import type { RootStackParamList } from "../../../App";
@@ -215,8 +216,8 @@ export function CreateGameDialog({ visible, friend, onClose }: CreateGameDialogP
           room,
         });
       }, 300);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create room");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsCreating(false);
     }

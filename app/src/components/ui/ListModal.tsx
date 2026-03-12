@@ -9,7 +9,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { View, ScrollView, Animated, type ViewStyle } from "react-native";
 import { Modal, type ModalProps } from "./Modal";
 import { Text } from "./Text";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 import { Pressable } from "./Pressable";
 import { SearchInput } from "./SearchInput";
 import { EmptyState, type EmptyStateProps } from "./EmptyState";
@@ -56,7 +56,7 @@ export interface ListModalProps<T> {
   // --- Footer action ---
   /** Optional footer button shown below the list */
   footerAction?: {
-    icon?: string;
+    icon?: IconName;
     label: string;
     onPress: () => void;
   };
@@ -240,7 +240,7 @@ export function ListModal<T>({
           >
             {footerAction.icon && (
               <Icon
-                name={footerAction.icon as any}
+                name={footerAction.icon}
                 size="md"
                 color={colors.primary[500]}
               />

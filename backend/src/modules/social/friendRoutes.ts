@@ -4,9 +4,9 @@
 
 import express from 'express';
 import * as friendController from './friendController';
-import { authenticate } from '../../shared/middleware/auth';
-import { validate, validateUUID } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { validate, validateUUID } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import {
   sendFriendRequestSchema,
   sendFriendRequestByIdentifierSchema,

@@ -1,15 +1,10 @@
 /**
  * Store Service
- * API methods for marketplace/store
+ * API methods for marketplace/store — ownership tracked server-side
  */
 
 import { api, ApiResponse } from './api';
-import * as SecureStore from 'expo-secure-store';
 import { transformUrl as sharedTransformUrl } from '@/utils/transformUrl';
-
-// Storage keys for owned items
-const OWNED_ALBUMS_KEY = 'owned_albums';
-const OWNED_SOUNDS_KEY = 'owned_sounds';
 
 // ============================================================================
 // TYPES
@@ -58,7 +53,7 @@ export interface SoundSection {
 export interface StorePackQuestion {
   number: number;
   question: string;
-  answer: string;
+  answers: string[];
   coverUrl: string | null;
 }
 
@@ -70,8 +65,11 @@ export interface StorePackPreview {
   coverUrl: string | null;
   textHint: string;
   price: number;
+  free: boolean;
+  category: string;
   numberOfQuestions: number;
   previewQuestions: StorePackQuestion[];
+  isOwned?: boolean;
 }
 
 export interface StoreData {
@@ -83,30 +81,22 @@ export interface StoreData {
   sounds: SoundSection[];
   ownedSounds: SoundItem[];
   packs: StorePackPreview[];
+  ownedPackIds: string[];
 }
 
 // ============================================================================
 // URL TRANSFORMATION
 // ============================================================================
 
-/**
- * Transform server URL to use correct base URL for current platform
- */
 function transformUrl(url: string): string {
   if (!url) return '';
   return sharedTransformUrl(url) || '';
 }
 
-/**
- * Transform all URLs in store item
- */
 function transformStoreItem<T extends StoreItem>(item: T): T {
   return { ...item, url: transformUrl(item.url) };
 }
 
-/**
- * Transform album with all its avatar URLs
- */
 function transformAlbum(album: AvatarAlbum): AvatarAlbum {
   return {
     ...album,
@@ -115,9 +105,6 @@ function transformAlbum(album: AvatarAlbum): AvatarAlbum {
   };
 }
 
-/**
- * Transform sound section with all URLs
- */
 function transformSoundSection(section: SoundSection): SoundSection {
   return {
     ...section,
@@ -128,12 +115,6 @@ function transformSoundSection(section: SoundSection): SoundSection {
   };
 }
 
-/**
- * Transform all URLs in store data
- */
-/**
- * Transform pack preview URLs
- */
 function transformPackPreview(pack: StorePackPreview): StorePackPreview {
   return {
     ...pack,
@@ -145,18 +126,16 @@ function transformPackPreview(pack: StorePackPreview): StorePackPreview {
   };
 }
 
-function transformStoreData(data: StoreData): StoreData {
-  const avatars = data.avatars || { free: [], albums: [], ownedAlbums: [] };
-  return {
-    avatars: {
-      free: (avatars.free || []).map(transformStoreItem),
-      albums: (avatars.albums || []).map(transformAlbum),
-      ownedAlbums: (avatars.ownedAlbums || []).map(transformAlbum),
-    },
-    sounds: (data.sounds || []).map(transformSoundSection),
-    ownedSounds: (data.ownedSounds || []).map(transformStoreItem) as SoundItem[],
-    packs: (data.packs || []).map(transformPackPreview),
-  };
+// ============================================================================
+// SERVER RESPONSE TYPE (what /store actually returns)
+// ============================================================================
+
+interface StoreApiResponse {
+  avatars: { free: StoreItem[]; albums: AvatarAlbum[] };
+  sounds: SoundSection[];
+  packs: StorePackPreview[];
+  ownedPackIds?: string[];
+  ownedAlbumIds?: string[];
 }
 
 // ============================================================================
@@ -165,113 +144,45 @@ function transformStoreData(data: StoreData): StoreData {
 
 class StoreService {
   /**
-   * Get owned album IDs from local storage
-   */
-  async getOwnedAlbumIds(): Promise<string[]> {
-    try {
-      const data = await SecureStore.getItemAsync(OWNED_ALBUMS_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Get owned sound IDs from local storage
-   */
-  async getOwnedSoundIds(): Promise<string[]> {
-    try {
-      const data = await SecureStore.getItemAsync(OWNED_SOUNDS_KEY);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Add an album to owned list
-   */
-  async addOwnedAlbum(albumId: string): Promise<void> {
-    const owned = await this.getOwnedAlbumIds();
-    if (!owned.includes(albumId)) {
-      owned.push(albumId);
-      await SecureStore.setItemAsync(OWNED_ALBUMS_KEY, JSON.stringify(owned));
-    }
-  }
-
-  /**
-   * Add a sound to owned list
-   */
-  async addOwnedSound(soundId: string): Promise<void> {
-    const owned = await this.getOwnedSoundIds();
-    if (!owned.includes(soundId)) {
-      owned.push(soundId);
-      await SecureStore.setItemAsync(OWNED_SOUNDS_KEY, JSON.stringify(owned));
-    }
-  }
-
-  /**
-   * Get all store data (avatars and sounds) with ownership info
+   * Get all store data with server-tracked ownership
    */
   async getStoreData(): Promise<ApiResponse<StoreData>> {
-    // Fetch store data and owned items in parallel
-    const [response, ownedAlbumIds, ownedSoundIds] = await Promise.all([
-      api.get<{ avatars: { free: StoreItem[]; albums: AvatarAlbum[] }; sounds: SoundSection[]; packs: StorePackPreview[] }>('/store'),
-      this.getOwnedAlbumIds(),
-      this.getOwnedSoundIds(),
-    ]);
+    const response = await api.get<StoreApiResponse>('/store');
 
     if (response.success && response.data) {
-      const transformed = transformStoreData({
-        ...response.data,
-        avatars: {
-          ...response.data.avatars,
-          ownedAlbums: [],
-        },
-        sounds: response.data.sounds,
-        ownedSounds: [],
-        packs: response.data.packs || [],
-      });
+      const { avatars, sounds, packs, ownedPackIds = [], ownedAlbumIds = [] } = response.data;
 
-      // Mark albums as owned and separate them
+      const ownedAlbumSet = new Set(ownedAlbumIds);
+
+      // Transform and split albums into owned vs available
+      const allAlbums = (avatars.albums || []).map(transformAlbum);
       const ownedAlbums: AvatarAlbum[] = [];
       const availableAlbums: AvatarAlbum[] = [];
 
-      (transformed.avatars.albums || []).forEach(album => {
-        if (ownedAlbumIds.includes(album.id)) {
+      allAlbums.forEach(album => {
+        if (ownedAlbumSet.has(album.id)) {
           ownedAlbums.push({ ...album, isOwned: true });
         } else {
           availableAlbums.push(album);
         }
       });
 
-      // Collect owned sounds from all sections
-      const ownedSounds: SoundItem[] = [];
-
-      (transformed.sounds || []).forEach(section => {
-        (section.subSections || []).forEach(subSection => {
-          (subSection.sounds || []).forEach(sound => {
-            if (ownedSoundIds.includes(sound.id)) {
-              ownedSounds.push({ ...sound, isOwned: true });
-            }
-          });
-          // Mark sounds as owned in place
-          subSection.sounds = (subSection.sounds || []).map(sound => ({
-            ...sound,
-            isOwned: ownedSoundIds.includes(sound.id),
-          }));
-        });
-      });
+      // Mark packs as owned
+      const packsWithOwnership = (packs || []).map(transformPackPreview).map(pack => ({
+        ...pack,
+        isOwned: ownedPackIds.includes(pack.id),
+      }));
 
       (response as ApiResponse<StoreData>).data = {
         avatars: {
-          free: transformed.avatars.free,
+          free: (avatars.free || []).map(transformStoreItem),
           albums: availableAlbums,
           ownedAlbums,
         },
-        sounds: transformed.sounds,
-        ownedSounds,
-        packs: transformed.packs,
+        sounds: (sounds || []).map(transformSoundSection),
+        ownedSounds: [],
+        packs: packsWithOwnership,
+        ownedPackIds,
       };
     }
 
@@ -305,47 +216,35 @@ class StoreService {
   }
 
   /**
-   * Purchase an avatar album
+   * Purchase an avatar album (server handles coins + persistence)
    */
-  async purchaseAvatarAlbum(albumId: string): Promise<ApiResponse<{ albumId: string; purchased: boolean }>> {
-    const response = await api.post<{ albumId: string; purchased: boolean }>(`/store/purchase/avatar-album/${albumId}`);
-    if (response.success) {
-      // Add to local owned list
-      await this.addOwnedAlbum(albumId);
-    }
-    return response;
+  async purchaseAvatarAlbum(albumId: string): Promise<ApiResponse<{ albumId: string; purchased: boolean; newBalance: number }>> {
+    return api.post<{ albumId: string; purchased: boolean; newBalance: number }>(`/store/purchase/avatar-album/${albumId}`);
   }
 
   /**
    * Purchase a sound
    */
   async purchaseSound(soundId: string): Promise<ApiResponse<{ soundId: string; purchased: boolean }>> {
-    const response = await api.post<{ soundId: string; purchased: boolean }>(`/store/purchase/sound/${encodeURIComponent(soundId)}`);
-    if (response.success) {
-      // Add to local owned list
-      await this.addOwnedSound(soundId);
-    }
-    return response;
+    return api.post<{ soundId: string; purchased: boolean }>(`/store/purchase/sound/${encodeURIComponent(soundId)}`);
   }
 
   /**
-   * Purchase a pack
+   * Purchase a pack (server handles coins + persistence)
    */
-  async purchasePack(packId: string): Promise<ApiResponse<{ packId: string; purchased: boolean }>> {
-    return api.post<{ packId: string; purchased: boolean }>(`/store/purchase/pack/${packId}`);
+  async purchasePack(packId: string): Promise<ApiResponse<{ packId: string; purchased: boolean; newBalance: number }>> {
+    return api.post<{ packId: string; purchased: boolean; newBalance: number }>(`/store/purchase/pack/${encodeURIComponent(packId)}`);
   }
 
   /**
    * Purchase coins package
    */
-  async purchaseCoins(packageId: string): Promise<ApiResponse<{
-    coinsAdded: number;
-    newBalance: number;
-  }>> {
-    return api.post<{ coinsAdded: number; newBalance: number }>(
-      '/store/purchase/coins',
-      { packageId }
-    );
+  async purchaseCoins(data: {
+    packageId: string;
+    receiptToken: string;
+    platform: 'ios' | 'android' | 'web';
+  }): Promise<ApiResponse<{ coinsAdded: number; newBalance: number }>> {
+    return api.post<{ coinsAdded: number; newBalance: number }>('/store/purchase/coins', data);
   }
 }
 

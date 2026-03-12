@@ -4,6 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import { type ImageSourcePropType } from 'react-native';
 import { Toast, ToastVariant, ToastPosition } from '@/components/ui';
 
 interface ToastConfig {
@@ -13,6 +14,10 @@ interface ToastConfig {
   duration?: number;
   actionText?: string;
   onAction?: () => void;
+  /** Custom image source (replaces the variant icon) */
+  image?: ImageSourcePropType;
+  /** Custom image URI (replaces the variant icon) */
+  imageUri?: string;
 }
 
 interface ToastContextType {
@@ -103,6 +108,8 @@ export function ToastProvider({ children }: ToastProviderProps) {
         onHide={hideToast}
         actionText={config.actionText}
         onAction={config.onAction}
+        image={config.image}
+        imageUri={config.imageUri}
       />
     </ToastContext.Provider>
   );

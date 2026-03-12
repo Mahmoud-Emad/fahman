@@ -5,7 +5,7 @@
 import React from "react";
 import { View, Pressable, Animated, StyleSheet, ActivityIndicator } from "react-native";
 import type { EdgeInsets } from "react-native-safe-area-context";
-import { Text, Icon, Avatar } from "@/components/ui";
+import { Text, Icon, Avatar, type IconName } from "@/components/ui";
 import { type PublicUserProfile } from "@/services/userService";
 import { colors, withOpacity } from "@/themes";
 
@@ -26,7 +26,7 @@ export interface DisplayData {
     currentStreak: number;
     bestStreak: number;
   };
-  achievements: { id: string; name: string; icon: string; color: string; earned: boolean }[];
+  achievements: { id: string; name: string; icon: IconName; color: string; earned: boolean }[];
   recentGames: { id: string; packName: string; result: string; score: number; date: string }[];
 }
 

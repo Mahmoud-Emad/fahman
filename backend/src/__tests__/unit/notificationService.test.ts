@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
-import { NotFoundError, ForbiddenError } from '../../shared/utils/errors';
+import { NotFoundError, ForbiddenError } from '@shared/utils/errors';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -76,7 +76,7 @@ mock.module('../../shared/utils/logger', () => ({
 }));
 
 // Import after mocking so the module picks up the mocked prisma
-import { NotificationService } from '../../modules/social/notificationService';
+import { NotificationService } from '@modules/social/notificationService';
 
 // ---------------------------------------------------------------------------
 // Tests

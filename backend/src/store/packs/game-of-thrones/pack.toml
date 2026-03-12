@@ -1,13 +1,16 @@
 [pack-info]
+id = "5faa2164-33f0-4578-8396-aed839eb3b6f"
 name = "Game of Thrones"
 description = "Test your knowledge of the world of Westeros and its legendary characters."
 version = "1.0.0"
 author = "Fahman"
-cover = "./media/got.png"
-text-hint = ""
+cover = "./media/cover.png"
+text-hint = "Try to recall the characters, places, and famous events from Game of Thrones!"
 price = 0
-preview-questions = 0
+preview-questions = 3
 number-of-questions = 10
+category = "series"
+free = true
 
 [question1]
 question = "What is the name of the Stark family castle?"

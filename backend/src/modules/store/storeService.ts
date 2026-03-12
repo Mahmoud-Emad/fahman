@@ -5,12 +5,9 @@
 
 import { readdirSync, statSync, existsSync } from 'fs';
 import { join, basename, extname } from 'path';
-import { prisma } from '../../config/database';
-import { getRedis } from '../../config/redis';
-import { ValidationError } from '../../shared/utils/errors';
-import { config } from '../../config/env';
-import logger from '../../shared/utils/logger';
+import { config } from '@config/env';
 import { packStoreService, type StorePackPreview } from './packStoreService';
+import { storePurchaseService } from './storePurchaseService';
 
 // Store directory paths
 const STORE_DIR = join(__dirname, '../../store');
@@ -157,7 +154,7 @@ class StoreService {
       id: `avatar/free/${basename(filename, extname(filename))}`,
       name: basename(filename, extname(filename)),
       displayName: toDisplayName(filename),
-      url: `${this.baseUrl}/store/avatars/free/${filename}`,
+      url: `${this.baseUrl}/static/store/avatars/free/${filename}`,
       type: 'avatar' as const,
     }));
   }
@@ -180,7 +177,7 @@ class StoreService {
         id: `avatar/albums/${albumName}/${basename(filename, extname(filename))}`,
         name: basename(filename, extname(filename)),
         displayName: toDisplayName(filename),
-        url: `${this.baseUrl}/store/avatars/albums/${albumName}/${filename}`,
+        url: `${this.baseUrl}/static/store/avatars/albums/${albumName}/${filename}`,
         type: 'avatar' as const,
       }));
 
@@ -189,7 +186,7 @@ class StoreService {
         name: albumName,
         displayName: toDisplayName(albumName),
         previewUrl: previewFile
-          ? `${this.baseUrl}/store/avatars/albums/${albumName}/${previewFile}`
+          ? `${this.baseUrl}/static/store/avatars/albums/${albumName}/${previewFile}`
           : '',
         avatars,
         price: AVATAR_ALBUM_PRICE,
@@ -228,7 +225,7 @@ class StoreService {
             id: `sound/${sectionName}/${basename(filename, extname(filename))}`,
             name: basename(filename, extname(filename)),
             displayName: toDisplayName(filename),
-            url: `${this.baseUrl}/store/sounds/${sectionName}/${filename}`,
+            url: `${this.baseUrl}/static/store/sounds/${sectionName}/${filename}`,
             type: 'sound' as const,
             price: SOUND_PRICE,
           })),
@@ -249,7 +246,7 @@ class StoreService {
               id: `sound/${sectionName}/${subSectionName}/${basename(filename, extname(filename))}`,
               name: basename(filename, extname(filename)),
               displayName: toDisplayName(filename),
-              url: `${this.baseUrl}/store/sounds/${sectionName}/${subSectionName}/${filename}`,
+              url: `${this.baseUrl}/static/store/sounds/${sectionName}/${subSectionName}/${filename}`,
               type: 'sound' as const,
               price: SOUND_PRICE,
             })),
@@ -274,78 +271,40 @@ class StoreService {
   // --------------------------------------------------------------------------
 
   /**
-   * Get all store data (cached in Redis for 1 hour)
+   * Get all store data (always fresh from filesystem)
    */
-  async getAllStoreData(): Promise<StoreResponse> {
-    return this.cachedGet('store:all', 3600, async () => ({
+  getAllStoreData(): StoreResponse {
+    return {
       avatars: {
         free: this.getFreeAvatars(),
         albums: this.getAvatarAlbums(),
       },
       sounds: this.getSoundSections(),
-      packs: await packStoreService.getPackPreviews(),
-    }));
+      packs: packStoreService.getPackPreviews(),
+    };
   }
 
   /**
-   * Get only avatars (cached in Redis for 1 hour)
+   * Get only avatars
    */
-  async getAvatarsData() {
-    return this.cachedGet('store:avatars', 3600, () => ({
+  getAvatarsData() {
+    return {
       free: this.getFreeAvatars(),
       albums: this.getAvatarAlbums(),
-    }));
-  }
-
-  /**
-   * Get only sounds (cached in Redis for 1 hour)
-   */
-  async getSoundsData() {
-    return this.cachedGet('store:sounds', 3600, () => this.getSoundSections());
-  }
-
-  /**
-   * Generic Redis cache helper
-   */
-  private async cachedGet<T>(key: string, ttl: number, compute: () => T | Promise<T>): Promise<T> {
-    try {
-      const redis = getRedis();
-      const cached = await redis.get(key);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-      const result = await compute();
-      await redis.set(key, JSON.stringify(result), 'EX', ttl);
-      return result;
-    } catch {
-      logger.debug(`Cache miss/error for ${key}, computing fresh`);
-      return await compute();
-    }
-  }
-
-  /**
-   * Purchase a coin package and add coins to user balance
-   */
-  async purchaseCoins(userId: string, packageId: string): Promise<{ coinsAdded: number; newBalance: number }> {
-    const packages: Record<string, number> = {
-      pack_50: 50,
-      pack_150: 150,
-      pack_500: 500,
     };
-
-    const coinsToAdd = packages[packageId];
-    if (!coinsToAdd) {
-      throw new ValidationError('Invalid package. Must be one of: pack_50, pack_150, pack_500');
-    }
-
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: { coins: { increment: coinsToAdd } },
-      select: { coins: true },
-    });
-
-    return { coinsAdded: coinsToAdd, newBalance: user.coins };
   }
+
+  /**
+   * Get only sounds
+   */
+  getSoundsData() {
+    return this.getSoundSections();
+  }
+
+  // Delegate purchase operations to storePurchaseService
+  getUserOwnedStorePackIds = storePurchaseService.getUserOwnedStorePackIds.bind(storePurchaseService);
+  purchaseStorePack = storePurchaseService.purchaseStorePack.bind(storePurchaseService);
+  purchaseCoins = storePurchaseService.purchaseCoins.bind(storePurchaseService);
 }
 
 export const storeService = new StoreService();

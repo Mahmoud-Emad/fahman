@@ -1,0 +1,93 @@
+[pack-info]
+name = "Breaking Bad"
+description = "Test your knowledge of one of the greatest TV series ever made."
+version = "1.0.0"
+id = "1edbe640-e672-4532-9eeb-f7f999676447"
+author = "Fahman"
+cover = "./media/cover.png"
+text-hint = ""
+price = 20
+preview-questions = 3
+number-of-questions = 20
+category = "TV Shows"
+free = false
+
+[question1]
+question = "What is the real name of the character known as Heisenberg?"
+answer = "Walter White"
+
+[question2]
+question = "Who is Walter White's former student and partner?"
+answer = "Jesse Pinkman"
+
+[question3]
+question = "What city does Breaking Bad mainly take place in?"
+answer = "Albuquerque"
+
+[question4]
+question = "What is the name of Walter White's wife?"
+answer = "Skyler White"
+
+[question5]
+question = "What color is the meth that Walter and Jesse become famous for?"
+answer = "Blue"
+
+[question6]
+question = "What fast food restaurant chain is used as a front for Gus Fring's drug business?"
+answer = "Los Pollos Hermanos"
+
+[question7]
+question = "What is the name of Walter White's brother-in-law who works for the DEA?"
+answer = "Hank Schrader"
+
+[question8]
+question = "What alias does Walter White use in the drug world?"
+answer = "Heisenberg"
+
+[question9]
+question = "What is the name of Saul Goodman's bodyguard and fixer?"
+answer = "Mike Ehrmantraut"
+
+[question10]
+question = "What type of vehicle does Walter White drive in the early seasons?"
+answer = "Pontiac Aztek"
+
+[question11]
+question = "What is the name of Jesse Pinkman's girlfriend who dies in season 2?"
+answer = "Jane Margolis"
+
+[question12]
+question = "What is the name of Walter White's son?"
+answer = "Walter White Jr"
+
+[question13]
+question = "What nickname does Jesse often say before talking?"
+answer = "Yo"
+
+[question14]
+question = "Who is the owner of Los Pollos Hermanos?"
+answer = "Gus Fring"
+
+[question15]
+question = "What lawyer helps Walter and Jesse with their legal problems?"
+answer = "Saul Goodman"
+
+[question16]
+question = "What disease is Walter White diagnosed with at the start of the series?"
+answer = "Lung Cancer"
+
+[question17]
+question = "What is the name of the prequel series about Saul Goodman?"
+answer = "Better Call Saul"
+
+[question18]
+question = "What phrase does Walter say when confronting Skyler: 'I am the ____'?"
+answer = "Danger"
+
+[question19]
+question = "What is the name of the neo-Nazi gang leader in the final season?"
+answer = "Jack Welker"
+
+[question20]
+question = "What is the title of the Breaking Bad sequel movie?"
+answer = "El Camino"

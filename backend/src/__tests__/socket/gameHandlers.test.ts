@@ -123,7 +123,7 @@ import {
   registerGameHandlers,
   broadcastGameStarted,
   cleanupGameRoom,
-} from '../../socket/handlers/gameHandlers';
+} from '@/socket/handlers/gameHandlers';
 
 // ---------------------------------------------------------------------------
 // Socket/IO mock helpers

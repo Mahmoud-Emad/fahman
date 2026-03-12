@@ -8,17 +8,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 import type { RootStackParamList } from "../../App";
-import { Text, Icon, Skeleton, Divider } from "@/components/ui";
+import { Text, Icon, Skeleton, Divider, Input, Dialog } from "@/components/ui";
 import { BottomNavBar } from "@/components/navigation";
 import { NotificationsModal, ChatsListModal, ChatDetailsModal } from "@/components/messaging";
 import { FriendsListModal, AddFriendModal, CreateGameDialog } from "@/components/friends";
 import { ActionRow } from "@/components/settings";
 import { SoundsSection, PrivacySection, LanguageSection } from "@/components/settings/SettingsSections";
 import { colors } from "@/themes";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { settingsService, type UserSettings } from "@/services/settingsService";
 import { api } from "@/services/api";
 import { useAuth, useToast, useMessaging } from "@/contexts";
-import { useMessaging as useMessagingHook, useFriends } from "@/hooks";
+import { useMessaging as useMessagingHook } from "@/hooks";
+import { useFriendsContext } from "@/contexts";
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -32,7 +34,7 @@ export function SettingsScreen() {
   const toast = useToast();
   const { unreadNotificationCount, unreadMessageCount } = useMessaging();
   const messaging = useMessagingHook();
-  const friendsHook = useFriends();
+  const friendsHook = useFriendsContext();
 
   // Settings state
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -44,6 +46,11 @@ export function SettingsScreen() {
   // Action loading states
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Delete account confirmation state
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePasswordError, setDeletePasswordError] = useState<string | undefined>(undefined);
 
   // Load settings and version on mount
   useEffect(() => {
@@ -105,8 +112,8 @@ export function SettingsScreen() {
         toast.error(response.message || "Failed to update setting");
         setSettings(prev => prev ? { ...prev, [key]: previousValue } : null);
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update setting");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
       setSettings(prev => prev ? { ...prev, [key]: previousValue } : null);
     }
   };
@@ -117,23 +124,17 @@ export function SettingsScreen() {
 
   const handleShare = async () => {
     try {
-      // App store links
       const appStoreLink = "https://apps.apple.com/app/fahman";
       const playStoreLink = "https://play.google.com/store/apps/details?id=com.fahman.app";
 
-      // Generate referral deep link
-      const referralLink = user?.id
-        ? `fahman://invite?referrer=${user.id}`
-        : "fahman://";
-
-      const shareMessage = `Join me on Fahman! The ultimate party game for friends. 🎮\n\n🔗 Tap to join: ${referralLink}\n\nDownload:\n📱 iOS: ${appStoreLink}\n🤖 Android: ${playStoreLink}`;
+      const shareMessage = `Join me on Fahman! The ultimate party game for friends.\n\nDownload:\niOS: ${appStoreLink}\nAndroid: ${playStoreLink}`;
 
       await Share.share({
         message: shareMessage,
         title: "Join me on Fahman!",
       });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to share app");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 
@@ -168,35 +169,38 @@ export function SettingsScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "DELETE",
-          style: "destructive",
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              const response = await settingsService.deleteAccount();
-              if (response.success) {
-                await logout();
-              } else {
-                setIsDeleting(false);
-                Alert.alert("Error", response.message || "Failed to delete account. Please try again.");
-              }
-            } catch (error) {
-              setIsDeleting(false);
-              Alert.alert("Error", "Failed to delete account. Please try again.");
-            }
-          },
-        },
-      ]
-    );
+    setDeletePassword("");
+    setDeletePasswordError(undefined);
+    setDeleteDialogVisible(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    // Require password for accounts that have one (email/phone users)
+    if (user?.email && !deletePassword.trim()) {
+      setDeletePasswordError("Please enter your password");
+      return;
+    }
+
+    setDeleteDialogVisible(false);
+    setIsDeleting(true);
+    try {
+      const response = await settingsService.deleteAccount(deletePassword || undefined);
+      if (response.success) {
+        await logout();
+      } else {
+        setIsDeleting(false);
+        Alert.alert("Error", response.message || "Failed to delete account. Please try again.");
+      }
+    } catch (error) {
+      setIsDeleting(false);
+      const message = getErrorMessage(error);
+      if (message.toLowerCase().includes("password")) {
+        setDeleteDialogVisible(true);
+        setDeletePasswordError(message);
+      } else {
+        Alert.alert("Error", message);
+      }
+    }
   };
 
   const handleTabPress = (tabId: string) => {
@@ -413,6 +417,30 @@ export function SettingsScreen() {
       <FriendsListModal visible={friendsHook.friendsListVisible} onClose={() => friendsHook.setFriendsListVisible(false)} friends={friendsHook.friends} friendRequests={friendsHook.friendRequests} sentRequests={friendsHook.sentRequests} onFriendPress={friendsHook.handleFriendPress} onMessageFriend={friendsHook.handleMessageFriend} onInviteFriend={friendsHook.handleInviteFriend} onAcceptRequest={friendsHook.handleAcceptFriendRequest} onDeclineRequest={friendsHook.handleDeclineFriendRequest} onCancelRequest={friendsHook.handleCancelFriendRequest} onAddFriend={friendsHook.handleAddFriend} isLoading={friendsHook.friendsLoading} />
       <AddFriendModal visible={friendsHook.addFriendVisible} onClose={() => friendsHook.setAddFriendVisible(false)} onCloseAll={friendsHook.closeAllModals} onFriendAdded={friendsHook.handleFriendAdded} />
       <CreateGameDialog visible={!!friendsHook.playFriend} friend={friendsHook.playFriend} onClose={() => friendsHook.setPlayFriend(null)} />
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog
+        visible={deleteDialogVisible}
+        onClose={() => setDeleteDialogVisible(false)}
+        title="Delete Account"
+        confirmText="DELETE"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setDeleteDialogVisible(false)}
+      >
+        <Text className="mb-4">This action cannot be undone. All your data will be permanently deleted.</Text>
+        <Input
+          placeholder="Enter your password to confirm"
+          value={deletePassword}
+          onChangeText={(text) => {
+            setDeletePassword(text);
+            if (deletePasswordError) setDeletePasswordError(undefined);
+          }}
+          secureTextEntry
+          error={deletePasswordError}
+        />
+      </Dialog>
     </View>
   );
 }

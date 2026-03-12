@@ -30,10 +30,27 @@ export interface Pack {
   };
 }
 
+export interface FreeStorePack {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  coverUrl: string | null;
+  textHint: string;
+  price: number;
+  free: boolean;
+  category: string;
+  numberOfQuestions: number;
+  previewQuestions: { number: number; question: string; answers: string[]; coverUrl: string | null }[];
+}
+
 export interface PackSelectionResponse {
   systemPacks: Pack[];
   userPacks: Pack[];
   popularPacks: Pack[];
+  freeStorePacks: FreeStorePack[];
+  paidStorePacks: FreeStorePack[];
+  ownedStorePacks: FreeStorePack[];
 }
 
 export interface Question {

@@ -4,11 +4,11 @@
 
 import express from 'express';
 import * as notificationController from './notificationController';
-import { authenticate } from '../../shared/middleware/auth';
-import { validate, validateUUID, validateQuery } from '../../shared/middleware/validation';
-import { asyncHandler } from '../../shared/middleware/asyncHandler';
+import { authenticate } from '@shared/middleware/auth';
+import { validate, validateUUID, validateQuery } from '@shared/middleware/validation';
+import { asyncHandler } from '@shared/middleware/asyncHandler';
 import { sendRoomInvitesSchema, resolveActionSchema } from './notificationValidator';
-import { paginationSchema } from '../../shared/middleware/paginationValidator';
+import { paginationSchema } from '@shared/middleware/paginationValidator';
 
 const router = express.Router();
 

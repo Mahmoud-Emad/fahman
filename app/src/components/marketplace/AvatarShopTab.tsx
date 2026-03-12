@@ -5,7 +5,7 @@
 import React, { useState } from "react";
 import { View, Pressable, ScrollView, Image, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Text, Icon } from "@/components/ui";
+import { Text, Icon, type IconName } from "@/components/ui";
 import {
   storeService,
   type StoreData,
@@ -32,7 +32,7 @@ export function SectionHeader({
   action,
   onActionPress,
 }: {
-  icon: string;
+  icon: IconName;
   title: string;
   badge?: string;
   badgeColor?: "primary" | "success" | "gold";
@@ -49,7 +49,7 @@ export function SectionHeader({
     <View className="flex-row items-center justify-between mb-3">
       <View className="flex-row items-center flex-1">
         <View className="w-8 h-8 rounded-lg items-center justify-center mr-2" style={{ backgroundColor: badgeStyles[badgeColor].bg }}>
-          <Icon name={icon as any} size="sm" color={badgeStyles[badgeColor].text} />
+          <Icon name={icon} size="sm" color={badgeStyles[badgeColor].text} />
         </View>
         <Text variant="body" className="font-bold" numberOfLines={1}>{title}</Text>
         {badge && (

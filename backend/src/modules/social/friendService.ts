@@ -3,8 +3,8 @@
  * Business logic for friend list management (get, search, block, status)
  */
 
-import { prisma } from '../../config/database';
-import { ValidationError, NotFoundError } from '../../shared/utils/errors';
+import { prisma } from '@config/database';
+import { ValidationError, NotFoundError } from '@shared/utils/errors';
 
 export class FriendService {
   /**

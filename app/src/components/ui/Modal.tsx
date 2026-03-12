@@ -2,10 +2,11 @@
  * Modal/Dialog component - Overlay dialog for important content
  * Slides up from bottom with dark backdrop fade
  *
- * Uses absolute-positioned overlay instead of RNModal to avoid
- * mount/unmount lifecycle issues that cause close-animation glitches.
+ * Uses RNModal (transparent) as a portal layer for correct full-screen
+ * rendering regardless of parent layout, with custom slide/fade animations.
+ * Follows the same proven pattern as BuyCoinsModal.
  */
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Pressable,
@@ -13,9 +14,7 @@ import {
   ScrollView,
   Dimensions,
   Animated,
-  BackHandler,
-  Platform,
-  StyleSheet,
+  Modal as RNModal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cn } from "@/utils/cn";
@@ -71,8 +70,8 @@ export interface ModalProps {
 }
 
 /**
- * Modal component for overlay dialogs
- * Renders as an absolute-positioned overlay within the parent screen.
+ * Modal component - bottom sheet rendered via RNModal for full-screen portal.
+ * Parent controls visibility; close animates out then calls onClose().
  */
 export function Modal({
   visible,
@@ -98,10 +97,6 @@ export function Modal({
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  // rendered = overlay is in the tree; visible = prop from parent
-  const [rendered, setRendered] = useState(false);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
 
   // Calculate max height
   const calculatedMaxHeight =
@@ -111,79 +106,78 @@ export function Modal({
         ? maxHeight
         : SCREEN_HEIGHT * MODAL_SIZES.DEFAULT_HEIGHT;
 
-  // Open: mount overlay, then animate in
+  // Animate in when visible, reset when hidden
   useEffect(() => {
     if (visible) {
-      slideAnim.setValue(SCREEN_HEIGHT);
-      fadeAnim.setValue(0);
-      setRendered(true);
-      // Start animation on the next frame so the overlay is mounted first
-      requestAnimationFrame(() => {
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-          Animated.spring(slideAnim, {
-            toValue: 0,
-            damping: 20,
-            stiffness: 150,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
-    } else if (rendered) {
-      // Close: animate out, then unmount overlay
       Animated.parallel([
         Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: SCREEN_HEIGHT,
+          toValue: 1,
           duration: 250,
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        setRendered(false);
-      });
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          damping: 20,
+          stiffness: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      slideAnim.setValue(SCREEN_HEIGHT);
+      fadeAnim.setValue(0);
     }
   }, [visible]);
 
-  // Android back button
-  useEffect(() => {
-    if (!rendered || Platform.OS !== "android") return;
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      onCloseRef.current();
-      return true;
-    });
-    return () => sub.remove();
-  }, [rendered]);
-
+  // Animate out, then call onClose so parent sets visible=false
   const handleClose = () => {
-    onCloseRef.current();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+    });
   };
 
-  if (!rendered) return null;
-
   return (
-    <View style={overlayStyles.root} pointerEvents="box-none">
-      {/* Animated Backdrop */}
-      <Animated.View
-        style={[overlayStyles.backdrop, { opacity: fadeAnim }]}
-      >
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={closeOnBackdrop ? handleClose : undefined}
-        />
-      </Animated.View>
+    <RNModal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={handleClose}
+      statusBarTranslucent
+    >
+      <View className="flex-1 justify-end" pointerEvents="box-none">
+        {/* Backdrop */}
+        <Animated.View
+          pointerEvents="auto"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: withOpacity(colors.black, 0.5),
+            opacity: fadeAnim,
+          }}
+        >
+          <Pressable
+            className="flex-1"
+            onPress={closeOnBackdrop ? handleClose : undefined}
+          />
+        </Animated.View>
 
-      {/* Bottom-aligned container for the sheet */}
-      <View style={overlayStyles.sheetContainer} pointerEvents="box-none">
+        {/* Bottom Sheet */}
         <Animated.View
           className={cn(bgColor, shadow, className)}
+          pointerEvents="auto"
           style={[
             {
               maxHeight: calculatedMaxHeight,
@@ -236,25 +230,9 @@ export function Modal({
           </ScrollView>
         </Animated.View>
       </View>
-    </View>
+    </RNModal>
   );
 }
-
-const overlayStyles = StyleSheet.create({
-  root: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 9999,
-    elevation: 9999,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: withOpacity(colors.black, 0.5),
-  },
-  sheetContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-});
 
 /**
  * Dialog component - Specialized modal for confirmations and alerts

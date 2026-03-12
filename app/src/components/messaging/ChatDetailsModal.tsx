@@ -27,6 +27,7 @@ import { MessageInput } from "./MessageInput";
 import type { Conversation, DirectMessage, RoomInviteData } from "./types";
 import { messageService } from "@/services/messageService";
 import { useToast } from "@/contexts";
+import { getErrorMessage } from "@/utils/errorUtils";
 import type { RootStackParamList } from "../../../App";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -125,8 +126,8 @@ export function ChatDetailsModal({
     try {
       const response = await messageService.deleteMessage(messageId);
       if (response.success) onDeleteMessage?.(messageId);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete message");
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
 

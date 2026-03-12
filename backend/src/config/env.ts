@@ -14,17 +14,21 @@ const envSchema = Joi.object({
   // Database
   DATABASE_URL: Joi.string().required(),
 
-  // JWT
-  JWT_SECRET: Joi.string().min(16).required(),
-  JWT_REFRESH_SECRET: Joi.string().min(16).required(),
+  // JWT — HMAC-SHA256 needs at least 32 bytes of key material
+  JWT_SECRET: Joi.string().min(32).required(),
+  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.string().default('1h'),
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('30d'),
 
   // Bcrypt
   BCRYPT_ROUNDS: Joi.number().integer().min(4).max(20).default(10),
 
-  // CORS
-  CORS_ORIGIN: Joi.string().default('http://localhost:3001'),
+  // CORS — required in production to prevent localhost default
+  CORS_ORIGIN: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().required(),
+    otherwise: Joi.string().default('http://localhost:3001'),
+  }),
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: Joi.number().default(900000),
@@ -34,13 +38,24 @@ const envSchema = Joi.object({
   // Logging
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
 
-  // OAuth
-  GOOGLE_CLIENT_ID: Joi.string().optional().allow(''),
-  FACEBOOK_APP_ID: Joi.string().optional().allow(''),
-  FACEBOOK_APP_SECRET: Joi.string().optional().allow(''),
+  // OAuth — empty strings fail validation; omit the var entirely if unused
+  GOOGLE_CLIENT_ID: Joi.string().min(1).optional(),
+  FACEBOOK_APP_ID: Joi.string().min(1).optional(),
+  FACEBOOK_APP_SECRET: Joi.string().min(1).optional(),
 
-  // Redis
-  REDIS_URL: Joi.string().default('redis://localhost:6379'),
+  // Redis — required in production to prevent silent localhost fallback
+  REDIS_URL: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().required(),
+    otherwise: Joi.string().default('redis://localhost:6379'),
+  }),
+
+  // Payment verification — must be enabled in production
+  PAYMENT_VERIFICATION_ENABLED: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.boolean().required().valid(true),
+    otherwise: Joi.boolean().default(false),
+  }),
 }).unknown(true);
 
 const { error, value: envVars } = envSchema.validate(process.env, {
@@ -78,7 +93,7 @@ export const config = {
   },
 
   cors: {
-    origin: envVars.CORS_ORIGIN as string,
+    origins: (envVars.CORS_ORIGIN as string).split(',').map((o: string) => o.trim()).filter(Boolean),
   },
 
   rateLimit: {
@@ -99,5 +114,9 @@ export const config = {
 
   redis: {
     url: envVars.REDIS_URL as string,
+  },
+
+  payment: {
+    verificationEnabled: envVars.PAYMENT_VERIFICATION_ENABLED as boolean,
   },
 } as const;
